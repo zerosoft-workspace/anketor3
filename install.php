@@ -117,6 +117,17 @@ SQL);
                 $logs[] = 'Mevcut sorular soru havuzuna kopyalandi.';
             }
         }
+
+        $responseAnswersExists = $pdo->query("SHOW TABLES LIKE 'response_answers'")->fetch();
+        if ($responseAnswersExists) {
+            $typeColumn = $pdo->query("SHOW COLUMNS FROM response_answers LIKE 'type'")->fetch();
+            if (!$typeColumn) {
+                $pdo->exec("ALTER TABLE response_answers ADD COLUMN type ENUM('multiple_choice','rating','text') NULL DEFAULT NULL AFTER option_id");
+                $logs[] = 'response_answers tablosuna type alani eklendi.';
+            } else {
+                $logs[] = 'response_answers tablosundaki type alani guncel.';
+            }
+        }
     } catch (Throwable $e) {
         $errors[] = 'Sema guncelleme hatasi: ' . $e->getMessage();
     }

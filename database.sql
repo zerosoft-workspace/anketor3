@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS response_answers (
     response_id INT UNSIGNED NOT NULL,
     question_id INT UNSIGNED NOT NULL,
     option_id INT UNSIGNED NULL,
+    type ENUM('multiple_choice','rating','text') NULL,
     answer_text TEXT NULL,
     numeric_value DECIMAL(10,4) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -240,24 +241,25 @@ ON DUPLICATE KEY UPDATE
     participant_id = VALUES(participant_id),
     submitted_at = VALUES(submitted_at);
 
-INSERT INTO response_answers (id, response_id, question_id, option_id, answer_text, numeric_value, created_at) VALUES
-    (1, 1, 1, NULL, NULL, 4.0, '2025-03-07 10:15:00'),
-    (2, 1, 2, 1, NULL, NULL, '2025-03-07 10:15:00'),
-    (3, 1, 3, NULL, 'Uygulama envanteri icin rehber ve kontrol listesi istiyorum.', NULL, '2025-03-07 10:15:00'),
-    (4, 2, 1, NULL, NULL, 5.0, '2025-03-08 14:20:00'),
-    (5, 2, 2, 2, NULL, NULL, '2025-03-08 14:20:00'),
-    (6, 2, 3, NULL, 'Egitim kayitlarinin tekrarina hizli erisim ihtiyacim var.', NULL, '2025-03-08 14:20:00'),
-    (7, 3, 4, NULL, NULL, 4.0, '2024-11-18 16:45:00'),
-    (8, 3, 5, 4, NULL, NULL, '2024-11-18 16:45:00'),
-    (9, 3, 6, NULL, 'Simulasyon mailleri ile egitimler surdurulmeli.', NULL, '2024-11-18 16:45:00'),
-    (10, 4, 4, NULL, NULL, 3.0, '2024-11-20 09:30:00'),
-    (11, 4, 5, 6, NULL, NULL, '2024-11-20 09:30:00'),
-    (12, 4, 6, NULL, 'Ekip icinde hizli paylasim icin prosedur guncellenmeli.', NULL, '2024-11-20 09:30:00')
+INSERT INTO response_answers (id, response_id, question_id, option_id, type, answer_text, numeric_value, created_at) VALUES
+    (1, 1, 1, NULL, 'rating', NULL, 4.0, '2025-03-07 10:15:00'),
+    (2, 1, 2, 1, 'multiple_choice', NULL, NULL, '2025-03-07 10:15:00'),
+    (3, 1, 3, NULL, 'text', 'Uygulama envanteri icin rehber ve kontrol listesi istiyorum.', NULL, '2025-03-07 10:15:00'),
+    (4, 2, 1, NULL, 'rating', NULL, 5.0, '2025-03-08 14:20:00'),
+    (5, 2, 2, 2, 'multiple_choice', NULL, NULL, '2025-03-08 14:20:00'),
+    (6, 2, 3, NULL, 'text', 'Egitim kayitlarinin tekrarina hizli erisim ihtiyacim var.', NULL, '2025-03-08 14:20:00'),
+    (7, 3, 4, NULL, 'rating', NULL, 4.0, '2024-11-18 16:45:00'),
+    (8, 3, 5, 4, 'multiple_choice', NULL, NULL, '2024-11-18 16:45:00'),
+    (9, 3, 6, NULL, 'text', 'Simulasyon mailleri ile egitimler surdurulmeli.', NULL, '2024-11-18 16:45:00'),
+    (10, 4, 4, NULL, 'rating', NULL, 3.0, '2024-11-20 09:30:00'),
+    (11, 4, 5, 6, 'multiple_choice', NULL, NULL, '2024-11-20 09:30:00'),
+    (12, 4, 6, NULL, 'text', 'Ekip icinde hizli paylasim icin prosedur guncellenmeli.', NULL, '2024-11-20 09:30:00')
 
 ON DUPLICATE KEY UPDATE
     response_id = VALUES(response_id),
     question_id = VALUES(question_id),
     option_id = VALUES(option_id),
+    type = VALUES(type),
     answer_text = VALUES(answer_text),
     numeric_value = VALUES(numeric_value);
 

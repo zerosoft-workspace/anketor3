@@ -4,6 +4,7 @@ class SurveyService
     private $db;
     private $config;
     private $aiClient;
+    private $responseAnswersHasTypeColumn = null;
 
     public function __construct(Database $db, array $config)
     {
@@ -297,6 +298,35 @@ class SurveyService
         }
     }
 
+    private function responseAnswersHasTypeColumn(): bool
+    {
+        if ($this->responseAnswersHasTypeColumn === null) {
+            try {
+                $column = $this->db->fetch("SHOW COLUMNS FROM response_answers LIKE 'type'");
+                $this->responseAnswersHasTypeColumn = $column ? true : false;
+            } catch (\Throwable $e) {
+                $this->responseAnswersHasTypeColumn = false;
+            }
+        }
+
+        return $this->responseAnswersHasTypeColumn;
+    }
+
+    private function getQuestionTypeMap(int $surveyId): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT id, question_type FROM survey_questions WHERE survey_id = ?',
+            [$surveyId]
+        );
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int)$row['id']] = $row['question_type'];
+        }
+
+        return $map;
+    }
+
     public function getParticipants(int $surveyId): array
     {
         return $this->db->fetchAll(
@@ -353,20 +383,49 @@ class SurveyService
             [$surveyId, $participantId]
         );
 
+        $hasTypeColumn = $this->responseAnswersHasTypeColumn();
+        $questionTypes = [];
+
+        if ($hasTypeColumn) {
+            $questionTypes = $this->getQuestionTypeMap($surveyId);
+        }
+
         foreach ($answers as $answer) {
             $questionId = (int)($answer['question_id'] ?? 0);
             if (!$questionId) {
                 continue;
             }
-            $optionId = $answer['option_id'] ?: null;
+            $optionId = $answer['option_id'] ?? null;
+            if ($optionId !== null) {
+                $optionId = (int)$optionId ?: null;
+            }
             $text = $answer['answer_text'] ?? null;
             $numeric = $answer['numeric_value'] ?? null;
 
-            $this->db->insert(
-                'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value)
-                 VALUES (?, ?, ?, ?, ?)',
-                [$responseId, $questionId, $optionId, $text, $numeric]
-            );
+            if ($hasTypeColumn) {
+                $questionType = $questionTypes[$questionId] ?? null;
+                if (!$questionType) {
+                    if ($numeric !== null) {
+                        $questionType = 'rating';
+                    } elseif ($optionId !== null) {
+                        $questionType = 'multiple_choice';
+                    } else {
+                        $questionType = 'text';
+                    }
+                }
+
+                $this->db->insert(
+                    'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value, type)
+                     VALUES (?, ?, ?, ?, ?, ?)',
+                    [$responseId, $questionId, $optionId, $text, $numeric, $questionType]
+                );
+            } else {
+                $this->db->insert(
+                    'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value)
+                     VALUES (?, ?, ?, ?, ?)',
+                    [$responseId, $questionId, $optionId, $text, $numeric]
+                );
+            }
         }
 
         if ($participantId) {
@@ -495,7 +554,7 @@ class SurveyService
         }
 
         $answerRows = $this->db->fetchAll(
-            'SELECT ra.*, sq.question_text, sq.question_type, sq.category_key, sq.order_index,
+            'SELECT ra.*, sq.question_text, COALESCE(sq.question_type, ra.type) AS question_type, sq.category_key, sq.order_index,
                     qo.option_text
              FROM response_answers ra
              INNER JOIN survey_questions sq ON sq.id = ra.question_id
