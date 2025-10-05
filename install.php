@@ -119,7 +119,24 @@ SQL);
         }
 
         $responseAnswersExists = $pdo->query("SHOW TABLES LIKE 'response_answers'")->fetch();
-        if ($responseAnswersExists) {
+        if (!$responseAnswersExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE response_answers (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    response_id INT UNSIGNED NOT NULL,
+    question_id INT UNSIGNED NOT NULL,
+    option_id INT UNSIGNED NULL,
+    type ENUM('multiple_choice','rating','text') NULL,
+    answer_text TEXT NULL,
+    numeric_value DECIMAL(10,4) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_answers_response FOREIGN KEY (response_id) REFERENCES survey_responses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_answers_question FOREIGN KEY (question_id) REFERENCES survey_questions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_answers_option FOREIGN KEY (option_id) REFERENCES question_options(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'response_answers tablosu olusturuldu.';
+        } else {
             $typeColumn = $pdo->query("SHOW COLUMNS FROM response_answers LIKE 'type'")->fetch();
             if (!$typeColumn) {
                 $pdo->exec("ALTER TABLE response_answers ADD COLUMN type ENUM('multiple_choice','rating','text') NULL DEFAULT NULL AFTER option_id");
