@@ -1,55 +1,55 @@
-# Anketor - Kişiye Özel Siber Güvenlik Raporlama
+# Anketor - KiÅŸiye Ã–zel Siber GÃ¼venlik Raporlama
 
-Anketor artık her katılımcıya, verdiği yanıtlara göre kişiselleştirilmiş siber güvenlik geri bildirimi sağlayan bir platformdur. Web uygulaması ve e-posta güvenliği gibi tema başlıklarına göre soruları kategorize eder, katılımcının güçlü yönlerini ve geliştirmesi gereken alanları madde madde raporlar.
+Anketor artÄ±k her katÄ±lÄ±mcÄ±ya, verdiÄŸi yanÄ±tlara gÃ¶re kiÅŸiselleÅŸtirilmiÅŸ siber gÃ¼venlik geri bildirimi saÄŸlayan bir platformdur. Web uygulamasÄ± ve e-posta gÃ¼venliÄŸi gibi tema baÅŸlÄ±klarÄ±na gÃ¶re sorularÄ± kategorize eder, katÄ±lÄ±mcÄ±nÄ±n gÃ¼Ã§lÃ¼ yÃ¶nlerini ve geliÅŸtirmesi gereken alanlarÄ± madde madde raporlar.
 
-## Öne Çıkanlar
-- Web ve e-posta güvenliği kategorileri için tek ankette birden fazla bölüm
-- Katılımcı akışı sonunda otomatik kişisel rapor (anonim token ile erişim)
-- OpenAI desteği aktifse kişiye özel aksiyon önerileri, aksi halde yerleşik fallback tavsiyeler
-- Admin panelinden katılımcı başına rapor görüntüleme ve e-posta davet takibi
-- PDF/CSV/SVG kurum raporları hâlâ mevcut; bireysel rapor bunların tamamlayıcısıdır
+## Ã–ne Ã‡Ä±kanlar
+- Web ve e-posta gÃ¼venliÄŸi kategorileri iÃ§in tek ankette birden fazla bÃ¶lÃ¼m
+- KatÄ±lÄ±mcÄ± akÄ±ÅŸÄ± sonunda otomatik kiÅŸisel rapor (anonim token ile eriÅŸim)
+- OpenAI desteÄŸi aktifse kiÅŸiye Ã¶zel aksiyon Ã¶nerileri, aksi halde yerleÅŸik fallback tavsiyeler
+- Admin panelinden katÄ±lÄ±mcÄ± baÅŸÄ±na rapor gÃ¶rÃ¼ntÃ¼leme ve e-posta davet takibi
+- PDF/CSV/SVG kurum raporlarÄ± hÃ¢lÃ¢ mevcut; bireysel rapor bunlarÄ±n tamamlayÄ±cÄ±sÄ±dÄ±r
 
 ## Kurulum
-1. `config.sample.php` dosyasını `config.php` olarak kopyalayın ve MySQL / mail / OpenAI bilgilerinizi girin.
-2. `install.php` sayfasını çalıştırdığınızda veritabanı mevcut değilse otomatik olarak oluşturulur ve demo verisi yüklenir. Sonrasında güvenlik için bu dosyayı kaldırmayı unutmayın.
-3. Varsayılan yönetici hesabı:
+1. `config.sample.php` dosyasÄ±nÄ± `config.php` olarak kopyalayÄ±n ve MySQL / mail / OpenAI bilgilerinizi girin.
+2. `install.php` sayfasÄ±nÄ± Ã§alÄ±ÅŸtÄ±rdÄ±ÄŸÄ±nÄ±zda veritabanÄ± mevcut deÄŸilse otomatik olarak oluÅŸturulur ve demo verisi yÃ¼klenir. SonrasÄ±nda gÃ¼venlik iÃ§in bu dosyayÄ± kaldÄ±rmayÄ± unutmayÄ±n.
+3. VarsayÄ±lan yÃ¶netici hesabÄ±:
    - E-posta: `admin@example.com`
-   - Şifre: `YeniParola123!`
-4. Giriş yaptıktan sonra `Anketler > Katılımcılar` bölümünden rapor linklerini test edebilirsiniz.
+   - Åifre: `YeniParola123!`
+4. GiriÅŸ yaptÄ±ktan sonra `Anketler > KatÄ±lÄ±mcÄ±lar` bÃ¶lÃ¼mÃ¼nden rapor linklerini test edebilirsiniz.
 
-## Veritabanı Yapısı
-- `survey_questions` tablosunda her soru için `category_key` alanı bulunur. Kişisel rapor kategorilerini bu anahtar üzerinden üretir.
-- `survey_responses` ile `response_answers` katılımcı yanıtlarını taşır. Yönlendirme token'ı `survey_participants.token` alanındadır.
+## VeritabanÄ± YapÄ±sÄ±
+- `survey_questions` tablosunda her soru iÃ§in `category_key` alanÄ± bulunur. KiÅŸisel rapor kategorilerini bu anahtar Ã¼zerinden Ã¼retir.
+- `survey_responses` ile `response_answers` katÄ±lÄ±mcÄ± yanÄ±tlarÄ±nÄ± taÅŸÄ±r. YÃ¶nlendirme token'Ä± `survey_participants.token` alanÄ±ndadÄ±r.
 
 ### Demo Verisi
-Kurulumdan sonra gelen örnekler:
-- Anket: **2025 Siber Güvenlik Kişisel Değerlendirme** (kategori anahtarları: `web_guvenligi`, `eposta_guvenligi`)
-- Katılımcı token'ları: `sec-2025-a1`, `sec-2025-b2`, `phish-2024-a1`, `phish-2024-b2`
-- Rapor örneği: `personal_report.php?response=1&token=sec-2025-a1`
+Kurulumdan sonra gelen Ã¶rnekler:
+- Anket: **2025 Siber GÃ¼venlik KiÅŸisel DeÄŸerlendirme** (kategori anahtarlarÄ±: `web_guvenligi`, `eposta_guvenligi`)
+- KatÄ±lÄ±mcÄ± token'larÄ±: `sec-2025-a1`, `sec-2025-b2`, `phish-2024-a1`, `phish-2024-b2`
+- Rapor Ã¶rneÄŸi: `personal_report.php?response=1&token=sec-2025-a1`
 
-## Yönetici Akışı
-1. `dashboard.php` – özet metrikler.
-2. `survey_edit.php` – anket meta bilgisi (tarih, durum, kategori).
-3. `survey_questions.php` – soru ekleme, kategori anahtarı giriş alanı ve AI öneri formu.
-4. `participants.php` – katılımcı listesi, davet maili gönderme, “Raporu Gör” bağlantısı.
-5. `survey_reports.php` – kurumsal PDF/CSV/SVG çıktıları, trend kıyasları ve akıllı rapor.
+## YÃ¶netici AkÄ±ÅŸÄ±
+1. `dashboard.php` â€“ Ã¶zet metrikler.
+2. `survey_edit.php` â€“ anket meta bilgisi (tarih, durum, kategori).
+3. `survey_questions.php` â€“ soru ekleme, kategori anahtarÄ± giriÅŸ alanÄ± ve AI Ã¶neri formu.
+4. `participants.php` â€“ katÄ±lÄ±mcÄ± listesi, davet maili gÃ¶nderme, â€œRaporu GÃ¶râ€ baÄŸlantÄ±sÄ±.
+5. `survey_reports.php` â€“ kurumsal PDF/CSV/SVG Ã§Ä±ktÄ±larÄ±, trend kÄ±yaslarÄ± ve akÄ±llÄ± rapor.
 
-## Katılımcı Deneyimi
-- Davet linki: `answer.php?id={survey_id}&token={token}` formatındadır.
-- Anket tamamlanınca kullanıcı `personal_report.php` sayfasına yönlendirilir; rapor bağlantısını saklayabilir.
-- Rapor ekranında güçlü alanlar, geliştirme alanları ve önerilen aksiyonlar açıkça listelenir. Admin girişi yapılmışsa panel navbarı görünür.
+## KatÄ±lÄ±mcÄ± Deneyimi
+- Davet linki: `answer.php?id={survey_id}&token={token}` formatÄ±ndadÄ±r.
+- Anket tamamlanÄ±nca kullanÄ±cÄ± `personal_report.php` sayfasÄ±na yÃ¶nlendirilir; rapor baÄŸlantÄ±sÄ±nÄ± saklayabilir.
+- Rapor ekranÄ±nda gÃ¼Ã§lÃ¼ alanlar, geliÅŸtirme alanlarÄ± ve Ã¶nerilen aksiyonlar aÃ§Ä±kÃ§a listelenir. Admin giriÅŸi yapÄ±lmÄ±ÅŸsa panel navbarÄ± gÃ¶rÃ¼nÃ¼r.
 
-## Kişisel Rapor Mantığı
-`SurveyService::generatePersonalReport()` katılımcı yanıtlarını kategori bazında gruplayıp ortalama skor, çoktan seçmeli tercih ve açık uçlu notları bir araya getirir. `AIClient::generatePersonalAdvice()` modeli tanımlıysa bu özetten anlamlı aksiyonlar üretir; aksi hâlde fallback metni kullanılır.
+## KiÅŸisel Rapor MantÄ±ÄŸÄ±
+`SurveyService::getParticipantResponses($participantId)` ilgili kiÅŸinin son yanÄ±t paketini (soru, seÃ§enek ve kategori anahtarÄ±yla) dÃ¶ndÃ¼rÃ¼r. Bu veri `SurveyService::generatePersonalReport(array $bundle)` ile iÅŸlenerek kategori bazlÄ± Ã¶zet, ortalama skor ve aksiyon Ã¶nerisi Ã¼retir. `AIClient::generatePersonalAdvice()` modeli tanÄ±mlÄ±ysa bu Ã¶zetin Ã¼stÃ¼ne kiÅŸiye Ã¶zel tavsiyeler ekler; aksi hÃ¢lde fallback metni devreye girer.
 
-## Kurulum Sayfası `install.php`
-- Veritabanı yoksa oluşturur, `database.sql` demo verisini yükler.
-- `CREATE DATABASE` veya `USE` komutları barındıran satırlar hosting kısıtına takılmasın diye otomatik atlanır.
-- Kurulum tamamlandıktan sonra admin paneline dönüş butonu sunar.
+## Kurulum SayfasÄ± `install.php`
+- VeritabanÄ± yoksa oluÅŸturur, `database.sql` demo verisini yÃ¼kler.
+- `CREATE DATABASE` veya `USE` komutlarÄ± barÄ±ndÄ±ran satÄ±rlar hosting kÄ±sÄ±tÄ±na takÄ±lmasÄ±n diye otomatik atlanÄ±r.
+- Kurulum tamamlandÄ±ktan sonra admin paneline dÃ¶nÃ¼ÅŸ butonu sunar.
 
-## Geliştirme Notları
-- Yeni soru eklerken `category_key` alanını doldurmayı unutmayın (örneğin `web_guvenligi`, `eposta_guvenligi`).
-- Kişisel rapor çıktısını genişletmek için `SurveyService::groupAnswersByCategory()` fonksiyonunda kategori bazlı hesaplamalar yapılmaktadır.
-- AI entegrasyonu kapalıysa `fallbackPersonalAdvice()` devreye girer.
+## GeliÅŸtirme NotlarÄ±
+- Yeni soru eklerken `category_key` alanÄ±nÄ± doldurmayÄ± unutmayÄ±n (Ã¶rneÄŸin `web_guvenligi`, `eposta_guvenligi`).
+- KiÅŸisel rapor Ã§Ä±ktÄ±sÄ±nÄ± geniÅŸletmek iÃ§in `SurveyService::groupAnswersByCategory()` fonksiyonunda kategori bazlÄ± hesaplamalar yapÄ±lmaktadÄ±r.
+- AI entegrasyonu kapalÄ±ysa `fallbackPersonalAdvice()` devreye girer.
 
-Demo veri ile oynayıp kişisel raporu deneyin; yeni kategoriler oluşturup farklı alanlar için (ör. mobil uygulama güvenliği, fiziksel güvenlik) anında yeni bölümler ekleyebilirsiniz.
+Demo veri ile oynayÄ±p kiÅŸisel raporu deneyin; yeni kategoriler oluÅŸturup farklÄ± alanlar iÃ§in (Ã¶r. mobil uygulama gÃ¼venliÄŸi, fiziksel gÃ¼venlik) anÄ±nda yeni bÃ¶lÃ¼mler ekleyebilirsiniz.
