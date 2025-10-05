@@ -25,6 +25,26 @@ $databaseName = $dbConfig['database'] ?? '';
 $charset = $dbConfig['charset'] ?? 'utf8mb4';
 $collation = $dbConfig['collation'] ?? ($charset . '_unicode_ci');
 
+function ensureSchemaUpToDate(PDO $pdo, array &$logs, array &$errors): void
+{
+    try {
+        $tableExists = $pdo->query("SHOW TABLES LIKE 'survey_questions'")->fetch();
+        if (!$tableExists) {
+            return;
+        }
+
+        $columnExists = $pdo->query("SHOW COLUMNS FROM survey_questions LIKE 'category_key'")->fetch();
+        if (!$columnExists) {
+            $pdo->exec("ALTER TABLE survey_questions ADD COLUMN category_key VARCHAR(100) NULL DEFAULT NULL AFTER question_type");
+            $logs[] = 'survey_questions tablosuna category_key alani eklendi.';
+        } else {
+            $logs[] = 'survey_questions tablosundaki category_key alani guncel.';
+        }
+    } catch (Throwable $e) {
+        $errors[] = 'Sema guncelleme hatasi: ' . $e->getMessage();
+    }
+}
+
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -33,6 +53,7 @@ $options = [
 
 $needsInstall = false;
 $hasTables = false;
+$pdo = null;
 
 try {
     $dsnWithDb = sprintf(
@@ -101,6 +122,29 @@ if ($needsInstall && empty($errors)) {
         $hasTables = true;
     } catch (Throwable $e) {
         $errors[] = 'Kurulum hatasi: ' . $e->getMessage();
+    }
+}
+
+if ($hasTables && empty($errors)) {
+    try {
+        if (!$pdo) {
+            $dsnWithDb = sprintf(
+                'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                $dbConfig['host'] ?? 'localhost',
+                $dbConfig['port'] ?? 3306,
+                $databaseName,
+                $charset
+            );
+            $pdo = new PDO($dsnWithDb, $dbConfig['username'] ?? '', $dbConfig['password'] ?? '', $options);
+        } else {
+            $pdo->exec('USE `' . str_replace('`', '``', $databaseName) . '`');
+        }
+    } catch (Throwable $e) {
+        $errors[] = 'Kurulum sonrasi baglanti hatasi: ' . $e->getMessage();
+    }
+
+    if ($pdo && empty($errors)) {
+        ensureSchemaUpToDate($pdo, $logs, $errors);
     }
 }
 
