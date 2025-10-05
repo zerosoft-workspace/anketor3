@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS survey_questions (
     survey_id INT UNSIGNED NOT NULL,
     question_text TEXT NOT NULL,
     question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
     is_required TINYINT(1) NOT NULL DEFAULT 0,
     max_length INT NULL,
     order_index INT NOT NULL DEFAULT 0,

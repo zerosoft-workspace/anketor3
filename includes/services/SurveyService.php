@@ -193,7 +193,16 @@ class SurveyService
     public function getParticipants(int $surveyId): array
     {
         return $this->db->fetchAll(
-            'SELECT * FROM survey_participants WHERE survey_id = ? ORDER BY created_at DESC',
+            'SELECT sp.*, (
+                 SELECT sr.id
+                 FROM survey_responses sr
+                 WHERE sr.participant_id = sp.id
+                 ORDER BY sr.submitted_at DESC, sr.id DESC
+                 LIMIT 1
+             ) AS response_id
+             FROM survey_participants sp
+             WHERE sp.survey_id = ?
+             ORDER BY sp.created_at DESC',
             [$surveyId]
         );
     }

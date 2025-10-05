@@ -84,6 +84,7 @@ include __DIR__ . '/templates/navbar.php';
                         <th>Davet</th>
                         <th>Durum</th>
                         <th>Link</th>
+                        <th>Rapor</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -95,6 +96,13 @@ include __DIR__ . '/templates/navbar.php';
                             <td><?php echo $participant['invited_at'] ? h(format_date($participant['invited_at'], 'd.m.Y H:i')) : '-'; ?></td>
                             <td><?php echo $participant['responded_at'] ? '<span class="status status-active">Tamamlandi</span>' : '<span class="status status-draft">Bekliyor</span>'; ?></td>
                             <td><input type="text" readonly value="<?php echo h($link); ?>" onclick="this.select();"></td>
+                            <td>
+                                <?php if (!empty($participant['response_id'])): ?>
+                                    <a class="button-link" href="personal_report.php?response=<?php echo (int)$participant['response_id']; ?>">Raporu Gör</a>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <a class="button-link" href="participants.php?id=<?php echo $surveyId; ?>&send=<?php echo (int)$participant['id']; ?>">E-posta Gonder</a>
                             </td>
