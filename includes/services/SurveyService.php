@@ -130,6 +130,7 @@ class SurveyService
                 $surveyId,
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -151,6 +152,7 @@ class SurveyService
             [
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -318,6 +320,7 @@ class SurveyService
             $this->addQuestion($newSurveyId, [
                 'question_text' => $question['question_text'],
                 'question_type' => $question['question_type'],
+                'category_key' => $question['category_key'] ?? null,
                 'is_required' => $question['is_required'],
                 'max_length' => $question['max_length'],
                 'order_index' => $question['order_index'],
