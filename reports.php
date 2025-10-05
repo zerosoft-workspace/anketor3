@@ -18,14 +18,19 @@ $recentReports = $db->fetchAll(
      LIMIT 5'
 );
 
+$pageTitle = 'Raporlar - ' . config('app.name', 'Anketor');
 $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
 <main class="container">
-    <div class="panel-header">
-        <h1>Genel Raporlar</h1>
-    </div>
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Analitik</p>
+            <h1>Genel Raporlar</h1>
+            <p class="page-subtitle">Anket performansını, trendleri ve akıllı rapor çıktılarınızı tek ekranda izleyin.</p>
+        </div>
+    </header>
 
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
@@ -33,15 +38,15 @@ include __DIR__ . '/templates/navbar.php';
 
     <section class="panel">
         <div class="panel-header">
-            <h2>Anket Performansi</h2>
+            <h2>Anket Performansı</h2>
         </div>
         <div class="panel-body">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Baslik</th>
+                        <th>Başlık</th>
                         <th>Durum</th>
-                        <th>Donem</th>
+                        <th>Dönem</th>
                         <th>Cevap</th>
                         <th></th>
                     </tr>
@@ -66,7 +71,7 @@ include __DIR__ . '/templates/navbar.php';
 
     <section class="panel">
         <div class="panel-header">
-            <h2>Son Akilli Raporlar</h2>
+            <h2>Son Akıllı Raporlar</h2>
         </div>
         <div class="panel-body">
             <?php if ($recentReports): ?>
@@ -83,7 +88,7 @@ include __DIR__ . '/templates/navbar.php';
                     <?php endforeach; ?>
                 </ul>
             <?php else: ?>
-                <p>Henuz rapor olusturulmadi.</p>
+                <p>Henüz rapor oluşturulmadı.</p>
             <?php endif; ?>
         </div>
     </section>

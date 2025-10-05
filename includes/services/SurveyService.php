@@ -514,6 +514,30 @@ class SurveyService
         );
     }
 
+    public function getAISuggestions(int $surveyId): array
+    {
+        return $this->db->fetchAll(
+            'SELECT * FROM survey_ai_suggestions WHERE survey_id = ? ORDER BY created_at DESC',
+            [$surveyId]
+        );
+    }
+
+    public function addAISuggestion(int $surveyId, string $prompt, string $suggestion): int
+    {
+        return $this->db->insert(
+            'INSERT INTO survey_ai_suggestions (survey_id, prompt, suggestion) VALUES (?, ?, ?)',
+            [$surveyId, $prompt, $suggestion]
+        );
+    }
+
+    public function deleteAISuggestion(int $surveyId, int $suggestionId): bool
+    {
+        return (bool)$this->db->execute(
+            'DELETE FROM survey_ai_suggestions WHERE survey_id = ? AND id = ?',
+            [$surveyId, $suggestionId]
+        );
+    }
+
     public function getReports(int $surveyId, ?string $type = null): array
     {
         if ($type) {
@@ -611,6 +635,15 @@ class SurveyService
         ];
 
         $report['advice'] = $this->aiClient()->generatePersonalAdvice($payload);
+        $manual = $this->getAISuggestions((int)$report['survey']['id']);
+        $report['manual_suggestions'] = array_map(function (array $item) {
+            return [
+                'id' => (int)$item['id'],
+                'prompt' => $item['prompt'],
+                'suggestion' => $item['suggestion'],
+                'created_at' => $item['created_at'],
+            ];
+        }, $manual);
 
         return $report;
     }

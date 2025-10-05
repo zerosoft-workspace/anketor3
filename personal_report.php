@@ -6,13 +6,13 @@ $token = $_GET['token'] ?? null;
 
 if ($responseId <= 0) {
     http_response_code(404);
-    exit('Rapor bulunamadý.');
+    exit('Rapor bulunamadÄ±.');
 }
 
 $report = $surveyService->generatePersonalReport($responseId);
 if (!$report) {
     http_response_code(404);
-    exit('Rapor bulunamadý.');
+    exit('Rapor bulunamadÄ±.');
 }
 
 $participantInfo = $report['participant'] ?? [];
@@ -30,7 +30,7 @@ if (current_user_id()) {
 
 if (!$allowed) {
     http_response_code(403);
-    exit('Bu rapora eriþim yetkiniz yok.');
+    exit('Bu rapora eriÅŸim yetkiniz yok.');
 }
 
 if (!empty($_SESSION['personal_report_response']) && (int)$_SESSION['personal_report_response'] === $responseId) {
@@ -42,6 +42,7 @@ $averageScore = $report['overview']['average_score'] ?? null;
 $strengths = $report['overview']['strengths'] ?? [];
 $gaps = $report['overview']['gaps'] ?? [];
 $advice = $report['advice'] ?? '';
+$manualSuggestions = $report['manual_suggestions'] ?? [];
 
 include __DIR__ . '/templates/header.php';
 if (current_user_id()) {
@@ -51,14 +52,14 @@ if (current_user_id()) {
 <main class="container personal-report">
     <section class="panel">
         <div class="panel-header">
-            <h1>Kiþisel Güvenlik Raporu</h1>
+            <h1>KiÅŸisel GÃ¼venlik Raporu</h1>
             <?php if ($submittedAt): ?>
                 <span class="badge badge-time"><?php echo h(format_date($submittedAt, 'd.m.Y H:i')); ?></span>
             <?php endif; ?>
         </div>
         <div class="panel-body">
             <?php if (!empty($participantInfo['email'])): ?>
-                <p class="report-subtitle">Sayýn <?php echo h($participantInfo['email']); ?>, verdiðiniz yanýtlarýn kýsa özeti:</p>
+                <p class="report-subtitle">SayÄ±n <?php echo h($participantInfo['email']); ?>, verdiÄŸiniz yanÄ±tlarÄ±n kÄ±sa Ã¶zeti:</p>
             <?php endif; ?>
             <div class="report-overview">
                 <div class="overview-item">
@@ -66,11 +67,11 @@ if (current_user_id()) {
                     <span class="value"><?php echo $averageScore !== null ? h($averageScore) : ' - '; ?></span>
                 </div>
                 <div class="overview-item">
-                    <span class="label">Güçlü Alanlar</span>
-                    <span class="value"><?php echo $strengths ? h(implode(', ', $strengths)) : 'Henüz belirlenmedi'; ?></span>
+                    <span class="label">GÃ¼Ã§lÃ¼ Alanlar</span>
+                    <span class="value"><?php echo $strengths ? h(implode(', ', $strengths)) : 'HenÃ¼z belirlenmedi'; ?></span>
                 </div>
                 <div class="overview-item">
-                    <span class="label">Geliþim Alanlarý</span>
+                    <span class="label">GeliÅŸim AlanlarÄ±</span>
                     <span class="value"><?php echo $gaps ? h(implode(', ', $gaps)) : 'Belirlenmedi'; ?></span>
                 </div>
             </div>
@@ -109,7 +110,7 @@ if (current_user_id()) {
     <?php if (!empty($advice)): ?>
         <section class="panel">
             <div class="panel-header">
-                <h2>Önerilen Aksiyon Planý</h2>
+                <h2>Ã–nerilen Aksiyon PlanÄ±</h2>
             </div>
             <div class="panel-body">
                 <p class="advice-text"><?php echo nl2br(h($advice)); ?></p>
@@ -117,9 +118,27 @@ if (current_user_id()) {
         </section>
     <?php endif; ?>
 
+    <?php if (!empty($manualSuggestions)): ?>
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Uzman NotlarÄ±</h2>
+            </div>
+            <div class="panel-body">
+                <ul class="knowledge-list">
+                    <?php foreach ($manualSuggestions as $item): ?>
+                        <li class="knowledge-item">
+                            <strong><?php echo h($item['prompt'] ?: 'Ã–neri'); ?></strong>
+                            <p><?php echo nl2br(h($item['suggestion'])); ?></p>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </section>
+    <?php endif; ?>
+
     <section class="panel">
         <div class="panel-body report-actions">
-            <a class="button-secondary" href="thank_you.php">Dönüþ Yap</a>
+            <a class="button-secondary" href="thank_you.php">DÃ¶nÃ¼ÅŸ Yap</a>
             <?php if (current_user_id()): ?>
                 <a class="button-secondary" href="survey_reports.php?id=<?php echo (int)$report['survey']['id']; ?>">Anket Raporuna Git</a>
             <?php endif; ?>
