@@ -38,6 +38,7 @@ if (is_post()) {
         $surveyService->addQuestion($surveyId, [
             'question_text' => trim($_POST['question_text'] ?? ''),
             'question_type' => $type,
+            'category_key' => trim($_POST['category_key'] ?? '') ?: null,
             'is_required' => !empty($_POST['is_required']),
             'max_length' => $type === 'text' ? (int)($_POST['max_length'] ?? 0) : null,
             'order_index' => (int)($_POST['order_index'] ?? 0),
@@ -178,6 +179,9 @@ include __DIR__ . '/templates/navbar.php';
                             <div>
                                 <strong>#<?php echo (int)$question['order_index']; ?> &raquo; <?php echo h($question['question_text']); ?></strong>
                                 <span class="tag tag-<?php echo h($question['question_type']); ?>"><?php echo h($question['question_type']); ?></span>
+                                <?php if (!empty($question['category_key'])): ?>
+                                    <span class="tag tag-category"><?php echo h($question['category_key']); ?></span>
+                                <?php endif; ?>
                                 <?php if ($question['is_required']): ?><span class="tag">Zorunlu</span><?php endif; ?>
                             </div>
                             <?php if (!empty($question['options'])): ?>

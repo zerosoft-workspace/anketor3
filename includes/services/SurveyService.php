@@ -130,6 +130,7 @@ class SurveyService
                 $surveyId,
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -151,6 +152,7 @@ class SurveyService
             [
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -191,7 +193,16 @@ class SurveyService
     public function getParticipants(int $surveyId): array
     {
         return $this->db->fetchAll(
-            'SELECT * FROM survey_participants WHERE survey_id = ? ORDER BY created_at DESC',
+            'SELECT sp.*, (
+                SELECT sr.id
+                FROM survey_responses sr
+                WHERE sr.participant_id = sp.id
+                ORDER BY sr.submitted_at DESC, sr.id DESC
+                LIMIT 1
+            ) AS last_response_id
+             FROM survey_participants sp
+             WHERE sp.survey_id = ?
+             ORDER BY sp.created_at DESC',
             [$surveyId]
         );
     }
@@ -318,6 +329,7 @@ class SurveyService
             $this->addQuestion($newSurveyId, [
                 'question_text' => $question['question_text'],
                 'question_type' => $question['question_type'],
+                'category_key' => $question['category_key'] ?? null,
                 'is_required' => $question['is_required'],
                 'max_length' => $question['max_length'],
                 'order_index' => $question['order_index'],
@@ -356,6 +368,50 @@ class SurveyService
 
         return $reports;
     }
+
+    public function getParticipantResponses(int $participantId): array
+    {
+        $participant = $this->db->fetch(
+            'SELECT sp.*, s.id AS survey_id
+             FROM survey_participants sp
+             INNER JOIN surveys s ON s.id = sp.survey_id
+             WHERE sp.id = ?',
+            [$participantId]
+        );
+
+        if (!$participant) {
+            return [];
+        }
+
+        $response = $this->db->fetch(
+            'SELECT * FROM survey_responses WHERE participant_id = ? ORDER BY submitted_at DESC, id DESC LIMIT 1',
+            [$participantId]
+        );
+
+        if (!$response) {
+            $survey = $this->getSurvey((int)$participant['survey_id']);
+
+            return [
+                'survey' => $survey ?: [],
+                'response' => null,
+                'participant' => [
+                    'id' => (int)$participant['id'],
+                    'email' => $participant['email'],
+                    'token' => $participant['token'],
+                ],
+                'categories' => [],
+                'overview' => [
+                    'average_score' => null,
+                    'category_count' => 0,
+                    'strengths' => [],
+                    'gaps' => [],
+                ],
+            ];
+        }
+
+        return $this->getResponseReport((int)$response['id']);
+    }
+
     public function getResponseReport(int $responseId): array
     {
         $response = $this->db->fetch(
@@ -402,16 +458,25 @@ class SurveyService
         ];
     }
 
-    public function generatePersonalReport(int $responseId): array
+    public function generatePersonalReport(array $bundle): array
     {
-        $report = $this->getResponseReport($responseId);
-        if (!$report) {
+        if (empty($bundle)) {
             return [];
+        }
+
+        if (!isset($bundle['categories']) && isset($bundle['answers']) && is_array($bundle['answers'])) {
+            $bundle['categories'] = $this->groupAnswersByCategory($bundle['answers']);
+        }
+
+        $categories = $bundle['categories'] ?? [];
+
+        if (!isset($bundle['overview'])) {
+            $bundle['overview'] = $this->summarizeCategories($categories);
         }
 
         $payload = [
             'survey' => [
-                'title' => $report['survey']['title'] ?? ''
+                'title' => $bundle['survey']['title'] ?? ''
             ],
             'categories' => array_map(function (array $category) {
                 return [
@@ -427,14 +492,14 @@ class SurveyService
                         ];
                     }, $category['questions']),
                 ];
-            }, $report['categories']),
-            'strengths' => $report['overview']['strengths'],
-            'gaps' => $report['overview']['gaps'],
+            }, $categories),
+            'strengths' => $bundle['overview']['strengths'] ?? [],
+            'gaps' => $bundle['overview']['gaps'] ?? [],
         ];
 
-        $report['advice'] = $this->aiClient()->generatePersonalAdvice($payload);
+        $bundle['advice'] = $this->aiClient()->generatePersonalAdvice($payload);
 
-        return $report;
+        return $bundle;
     }
 
     private function groupAnswersByCategory(array $rows): array

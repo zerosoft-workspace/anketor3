@@ -86,9 +86,15 @@ if (!$preview && is_post()) {
     }
 
     if (empty($errors)) {
-        $surveyService->recordResponse($surveyId, $participant['id'] ?? null, $answers);
-        $_SESSION['survey_completed'] = true;
-        redirect('thank_you.php');
+        $responseId = $surveyService->recordResponse($surveyId, $participant['id'] ?? null, $answers);
+        $_SESSION['personal_report_response'] = $responseId;
+
+        $redirectUrl = 'personal_report.php?response=' . $responseId;
+        if (!empty($participant['token'])) {
+            $redirectUrl .= '&token=' . urlencode($participant['token']);
+        }
+
+        redirect($redirectUrl);
     }
 }
 

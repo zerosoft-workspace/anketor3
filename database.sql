@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS survey_questions (
     survey_id INT UNSIGNED NOT NULL,
     question_text TEXT NOT NULL,
     question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(100) NULL,
     is_required TINYINT(1) NOT NULL DEFAULT 0,
     max_length INT NULL,
     order_index INT NOT NULL DEFAULT 0,
@@ -147,6 +148,7 @@ ON DUPLICATE KEY UPDATE
     survey_id = VALUES(survey_id),
     question_text = VALUES(question_text),
     question_type = VALUES(question_type),
+    category_key = VALUES(category_key),
     is_required = VALUES(is_required),
     max_length = VALUES(max_length),
     order_index = VALUES(order_index);
