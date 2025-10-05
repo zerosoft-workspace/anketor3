@@ -40,6 +40,83 @@ function ensureSchemaUpToDate(PDO $pdo, array &$logs, array &$errors): void
         } else {
             $logs[] = 'survey_questions tablosundaki category_key alani guncel.';
         }
+
+        $libraryExists = $pdo->query("SHOW TABLES LIKE 'question_library'")->fetch();
+        if (!$libraryExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE question_library (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
+    is_required TINYINT(1) NOT NULL DEFAULT 0,
+    max_length INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'question_library tablosu olusturuldu.';
+        } else {
+            $logs[] = 'question_library tablosu mevcut.';
+        }
+
+        $libraryOptionsExists = $pdo->query("SHOW TABLES LIKE 'question_library_options'")->fetch();
+        if (!$libraryOptionsExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE question_library_options (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    library_question_id INT UNSIGNED NOT NULL,
+    option_text VARCHAR(255) NOT NULL,
+    option_value VARCHAR(100) NULL,
+    order_index INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_library_options_question FOREIGN KEY (library_question_id) REFERENCES question_library(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'question_library_options tablosu olusturuldu.';
+        } else {
+            $logs[] = 'question_library_options tablosu mevcut.';
+        }
+
+        if (!$libraryExists) {
+            $questions = $pdo->query('SELECT * FROM survey_questions ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+            if ($questions) {
+                $insertQuestion = $pdo->prepare(
+                    'INSERT INTO question_library (question_text, question_type, category_key, is_required, max_length, created_at)
+                     VALUES (?, ?, ?, ?, ?, NOW())'
+                );
+                $insertOption = $pdo->prepare(
+                    'INSERT INTO question_library_options (library_question_id, option_text, option_value, order_index)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $selectOptions = $pdo->prepare('SELECT * FROM question_options WHERE question_id = ? ORDER BY order_index ASC, id ASC');
+
+                foreach ($questions as $question) {
+                    $insertQuestion->execute([
+                        $question['question_text'],
+                        $question['question_type'],
+                        $question['category_key'] ?? null,
+                        $question['is_required'] ?? 0,
+                        $question['max_length'] ?? null,
+                    ]);
+                    $libraryId = (int)$pdo->lastInsertId();
+
+                    if ($question['question_type'] === 'multiple_choice') {
+                        $selectOptions->execute([$question['id']]);
+                        $order = 0;
+                        foreach ($selectOptions->fetchAll(PDO::FETCH_ASSOC) as $option) {
+                            $insertOption->execute([
+                                $libraryId,
+                                $option['option_text'],
+                                $option['option_value'] ?? null,
+                                $order++,
+                            ]);
+                        }
+                        $selectOptions->closeCursor();
+                    }
+                }
+
+                $logs[] = 'Mevcut sorular soru havuzuna kopyalandi.';
+            }
+        }
     } catch (Throwable $e) {
         $errors[] = 'Sema guncelleme hatasi: ' . $e->getMessage();
     }

@@ -22,6 +22,27 @@ if (is_post()) {
     guard_csrf();
     $action = $_POST['action'] ?? 'create';
 
+    if ($action === 'add_from_library') {
+        $libraryQuestionId = (int)($_POST['library_question_id'] ?? 0);
+        $orderIndex = isset($_POST['order_index']) && $_POST['order_index'] !== ''
+            ? (int)$_POST['order_index']
+            : null;
+
+        if ($libraryQuestionId <= 0) {
+            set_flash('danger', 'Lutfen hazir sorulardan birini secin.');
+            redirect('survey_questions.php?id=' . $surveyId);
+        }
+
+        try {
+            $surveyService->addQuestionFromLibrary($surveyId, $libraryQuestionId, $orderIndex);
+            set_flash('success', 'Hazir soru ankete eklendi.');
+        } catch (InvalidArgumentException $e) {
+            set_flash('danger', $e->getMessage());
+        }
+
+        redirect('survey_questions.php?id=' . $surveyId);
+    }
+
     if ($action === 'create') {
         $type = $_POST['question_type'] ?? 'text';
         $options = [];
@@ -35,7 +56,7 @@ if (is_post()) {
             }
         }
 
-        $surveyService->addQuestion($surveyId, [
+        $questionData = [
             'question_text' => trim($_POST['question_text'] ?? ''),
             'question_type' => $type,
             'category_key' => ($categoryKey = trim($_POST['category_key'] ?? '')) !== '' ? $categoryKey : null,
@@ -43,7 +64,13 @@ if (is_post()) {
             'max_length' => $type === 'text' ? (int)($_POST['max_length'] ?? 0) : null,
             'order_index' => (int)($_POST['order_index'] ?? 0),
             'options' => $options,
-        ]);
+        ];
+
+        $surveyService->addQuestion($surveyId, $questionData);
+
+        if (!empty($_POST['save_to_library'])) {
+            $surveyService->addLibraryQuestion($questionData);
+        }
 
         set_flash('success', 'Soru eklendi.');
         redirect('survey_questions.php?id=' . $surveyId);
@@ -58,6 +85,15 @@ if (is_post()) {
 }
 
 $questions = $surveyService->getQuestions($surveyId);
+$libraryQuestions = $surveyService->getQuestionLibrary();
+$libraryByCategory = [];
+foreach ($libraryQuestions as $libraryQuestion) {
+    $groupKey = $libraryQuestion['category_key'] ?: 'Genel';
+    if (!isset($libraryByCategory[$groupKey])) {
+        $libraryByCategory[$groupKey] = [];
+    }
+    $libraryByCategory[$groupKey][] = $libraryQuestion;
+}
 $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
@@ -75,6 +111,50 @@ include __DIR__ . '/templates/navbar.php';
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
     <?php endif; ?>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>Hazir Sorudan Ekle</h2>
+        </div>
+        <div class="panel-body">
+            <?php if (empty($libraryQuestions)): ?>
+                <p>Henuz soru havuzunda kayit bulunmuyor. Yeni sorular olustururken "Soru havuzuna ekle" secenegini kullanabilirsiniz.</p>
+            <?php else: ?>
+                <form method="POST" class="form-horizontal">
+                    <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+                    <input type="hidden" name="action" value="add_from_library">
+                    <div class="form-group">
+                        <label for="library_question_id">Hazir Soru</label>
+                        <select id="library_question_id" name="library_question_id" required>
+                            <option value="">Bir soru secin</option>
+                            <?php foreach ($libraryByCategory as $group => $items): ?>
+                                <optgroup label="<?php echo h(str_replace('_', ' ', ucfirst($group))); ?>">
+                                    <?php foreach ($items as $item): ?>
+                                        <?php
+                                        $label = $item['question_text'];
+                                        if (function_exists('mb_strimwidth')) {
+                                            $label = mb_strimwidth($label, 0, 120, '...');
+                                        } elseif (strlen($label) > 120) {
+                                            $label = substr($label, 0, 117) . '...';
+                                        }
+                                        ?>
+                                        <option value="<?php echo (int)$item['id']; ?>"><?php echo h($label); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="library_order_index">Sirasi</label>
+                        <input type="number" id="library_order_index" name="order_index" value="<?php echo count($questions); ?>" min="0">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="button-primary">Hazir Soruyu Ekle</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </section>
 
     <section class="panel">
         <div class="panel-header">
@@ -114,6 +194,12 @@ include __DIR__ . '/templates/navbar.php';
                         <label>
                             <input type="checkbox" name="is_required" value="1"> Zorunlu soru
                         </label>
+                    </div>
+                    <div class="form-group checkbox">
+                        <label>
+                            <input type="checkbox" name="save_to_library" value="1"> Soru havuzuna ekle
+                        </label>
+                        <small class="help-text">Secerseniz soru ve secenekleri ayni kategori anahtariyla hazir sorulara eklenir.</small>
                     </div>
                 </div>
                 <div class="form-group">

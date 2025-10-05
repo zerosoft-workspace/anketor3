@@ -56,6 +56,25 @@ CREATE TABLE IF NOT EXISTS question_options (
     CONSTRAINT fk_options_question FOREIGN KEY (question_id) REFERENCES survey_questions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS question_library (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
+    is_required TINYINT(1) NOT NULL DEFAULT 0,
+    max_length INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS question_library_options (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    library_question_id INT UNSIGNED NOT NULL,
+    option_text VARCHAR(255) NOT NULL,
+    option_value VARCHAR(100) NULL,
+    order_index INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_library_options_question FOREIGN KEY (library_question_id) REFERENCES question_library(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS survey_participants (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     survey_id INT UNSIGNED NOT NULL,
@@ -162,6 +181,35 @@ INSERT INTO question_options (id, question_id, option_text, option_value, order_
 
 ON DUPLICATE KEY UPDATE
     question_id = VALUES(question_id),
+    option_text = VALUES(option_text),
+    option_value = VALUES(option_value),
+    order_index = VALUES(order_index);
+
+INSERT INTO question_library (id, question_text, question_type, category_key, is_required, max_length, created_at) VALUES
+    (1, 'Web uygulamalarinda guclu parola kullanirim.', 'rating', 'web_guvenligi', 1, NULL, '2025-02-20 09:05:00'),
+    (2, 'Cok faktorlu kimlik dogrulamasini hangi siklikla etkinlestiriyorsunuz?', 'multiple_choice', 'web_guvenligi', 1, NULL, '2025-02-20 09:06:00'),
+    (3, 'Web guvenligini artirmak icin hangi desteklere ihtiyaciniz var?', 'text', 'web_guvenligi', 0, 400, '2025-02-20 09:07:00'),
+    (4, 'Supheli e-postalari tanima becerimi 1-5 arasinda puanlarim.', 'rating', 'eposta_guvenligi', 1, NULL, '2024-10-01 09:40:00'),
+    (5, 'Olta saldirisi oldugunu dusundugunuz maili nasil raporlarsiniz?', 'multiple_choice', 'eposta_guvenligi', 1, NULL, '2024-10-01 09:41:00'),
+    (6, 'E-posta saldirilarina karsi daha guvende hissetmek icin ne gerekir?', 'text', 'eposta_guvenligi', 0, 400, '2024-10-01 09:42:00')
+
+ON DUPLICATE KEY UPDATE
+    question_text = VALUES(question_text),
+    question_type = VALUES(question_type),
+    category_key = VALUES(category_key),
+    is_required = VALUES(is_required),
+    max_length = VALUES(max_length);
+
+INSERT INTO question_library_options (id, library_question_id, option_text, option_value, order_index) VALUES
+    (1, 2, 'Her zaman', NULL, 1),
+    (2, 2, 'Cogu uygulamada', NULL, 2),
+    (3, 2, 'Nadiren', NULL, 3),
+    (4, 5, 'Aninda guvenlik ekibine bildiririm', NULL, 1),
+    (5, 5, 'Ekibime iletir ve teyit beklerim', NULL, 2),
+    (6, 5, 'Yanlislikla siler ya da yok sayarim', NULL, 3)
+
+ON DUPLICATE KEY UPDATE
+    library_question_id = VALUES(library_question_id),
     option_text = VALUES(option_text),
     option_value = VALUES(option_value),
     order_index = VALUES(order_index);

@@ -121,6 +121,95 @@ class SurveyService
         return $questions;
     }
 
+    public function getQuestionLibrary(?string $categoryKey = null): array
+    {
+        $params = [];
+        $sql = 'SELECT * FROM question_library';
+        if ($categoryKey !== null && $categoryKey !== '') {
+            $sql .= ' WHERE category_key = ?';
+            $params[] = $categoryKey;
+        }
+        $sql .= ' ORDER BY (category_key IS NULL) ASC, category_key ASC, question_text ASC';
+
+        $questions = $this->db->fetchAll($sql, $params);
+        foreach ($questions as &$question) {
+            if ($question['question_type'] === 'multiple_choice') {
+                $question['options'] = $this->db->fetchAll(
+                    'SELECT * FROM question_library_options WHERE library_question_id = ? ORDER BY order_index ASC, id ASC',
+                    [$question['id']]
+                );
+            }
+        }
+
+        return $questions;
+    }
+
+    public function getLibraryQuestion(int $questionId): array
+    {
+        $question = $this->db->fetch('SELECT * FROM question_library WHERE id = ?', [$questionId]);
+        if (!$question) {
+            return [];
+        }
+
+        if ($question['question_type'] === 'multiple_choice') {
+            $question['options'] = $this->db->fetchAll(
+                'SELECT * FROM question_library_options WHERE library_question_id = ? ORDER BY order_index ASC, id ASC',
+                [$questionId]
+            );
+        }
+
+        return $question;
+    }
+
+    public function addLibraryQuestion(array $data): int
+    {
+        $questionId = $this->db->insert(
+            'INSERT INTO question_library (question_text, question_type, category_key, is_required, max_length)
+             VALUES (?, ?, ?, ?, ?)',
+            [
+                $data['question_text'],
+                $data['question_type'],
+                $data['category_key'] ?? null,
+                !empty($data['is_required']) ? 1 : 0,
+                $data['max_length'] ?? null,
+            ]
+        );
+
+        if (!empty($data['options']) && is_array($data['options'])) {
+            $this->saveLibraryOptions($questionId, $data['options']);
+        }
+
+        return $questionId;
+    }
+
+    public function addQuestionFromLibrary(int $surveyId, int $libraryQuestionId, ?int $orderIndex = null): int
+    {
+        $libraryQuestion = $this->getLibraryQuestion($libraryQuestionId);
+        if (empty($libraryQuestion)) {
+            throw new InvalidArgumentException('Soru havuzunda eslesen kayit bulunamadi.');
+        }
+
+        $options = [];
+        if (!empty($libraryQuestion['options']) && is_array($libraryQuestion['options'])) {
+            foreach ($libraryQuestion['options'] as $option) {
+                $options[] = [
+                    'text' => $option['option_text'],
+                    'value' => $option['option_value'],
+                ];
+            }
+        }
+
+        return $this->addQuestion($surveyId, [
+            'question_text' => $libraryQuestion['question_text'],
+            'question_type' => $libraryQuestion['question_type'],
+            'category_key' => $libraryQuestion['category_key'] ?? null,
+            'is_required' => !empty($libraryQuestion['is_required']),
+            'max_length' => $libraryQuestion['max_length'] ?? null,
+            'order_index' => $orderIndex ?? 0,
+            'options' => $options,
+        ]);
+    }
+
     public function addQuestion(int $surveyId, array $data): int
     {
         $questionId = $this->db->insert(
@@ -171,6 +260,24 @@ class SurveyService
     public function deleteQuestion(int $questionId): bool
     {
         return $this->db->execute('DELETE FROM survey_questions WHERE id = ?', [$questionId]);
+    }
+
+    private function saveLibraryOptions(int $libraryQuestionId, array $options): void
+    {
+        $index = 0;
+        foreach ($options as $option) {
+            $text = is_array($option) ? ($option['text'] ?? '') : $option;
+            $value = is_array($option) ? ($option['value'] ?? null) : null;
+            if (trim($text) === '') {
+                continue;
+            }
+
+            $this->db->insert(
+                'INSERT INTO question_library_options (library_question_id, option_text, option_value, order_index)
+                 VALUES (?, ?, ?, ?)',
+                [$libraryQuestionId, $text, $value, $index++]
+            );
+        }
     }
 
     private function saveOptions(int $questionId, array $options): void
