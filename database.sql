@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS survey_questions (
     survey_id INT UNSIGNED NOT NULL,
     question_text TEXT NOT NULL,
     question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
     is_required TINYINT(1) NOT NULL DEFAULT 0,
     max_length INT NULL,
     order_index INT NOT NULL DEFAULT 0,
@@ -53,6 +54,25 @@ CREATE TABLE IF NOT EXISTS question_options (
     option_value VARCHAR(100) NULL,
     order_index INT NOT NULL DEFAULT 0,
     CONSTRAINT fk_options_question FOREIGN KEY (question_id) REFERENCES survey_questions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS question_library (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
+    is_required TINYINT(1) NOT NULL DEFAULT 0,
+    max_length INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS question_library_options (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    library_question_id INT UNSIGNED NOT NULL,
+    option_text VARCHAR(255) NOT NULL,
+    option_value VARCHAR(100) NULL,
+    order_index INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_library_options_question FOREIGN KEY (library_question_id) REFERENCES question_library(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS survey_participants (
@@ -82,6 +102,7 @@ CREATE TABLE IF NOT EXISTS response_answers (
     response_id INT UNSIGNED NOT NULL,
     question_id INT UNSIGNED NOT NULL,
     option_id INT UNSIGNED NULL,
+    type ENUM('multiple_choice','rating','text') NULL,
     answer_text TEXT NULL,
     numeric_value DECIMAL(10,4) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -165,6 +186,35 @@ ON DUPLICATE KEY UPDATE
     option_value = VALUES(option_value),
     order_index = VALUES(order_index);
 
+INSERT INTO question_library (id, question_text, question_type, category_key, is_required, max_length, created_at) VALUES
+    (1, 'Web uygulamalarinda guclu parola kullanirim.', 'rating', 'web_guvenligi', 1, NULL, '2025-02-20 09:05:00'),
+    (2, 'Cok faktorlu kimlik dogrulamasini hangi siklikla etkinlestiriyorsunuz?', 'multiple_choice', 'web_guvenligi', 1, NULL, '2025-02-20 09:06:00'),
+    (3, 'Web guvenligini artirmak icin hangi desteklere ihtiyaciniz var?', 'text', 'web_guvenligi', 0, 400, '2025-02-20 09:07:00'),
+    (4, 'Supheli e-postalari tanima becerimi 1-5 arasinda puanlarim.', 'rating', 'eposta_guvenligi', 1, NULL, '2024-10-01 09:40:00'),
+    (5, 'Olta saldirisi oldugunu dusundugunuz maili nasil raporlarsiniz?', 'multiple_choice', 'eposta_guvenligi', 1, NULL, '2024-10-01 09:41:00'),
+    (6, 'E-posta saldirilarina karsi daha guvende hissetmek icin ne gerekir?', 'text', 'eposta_guvenligi', 0, 400, '2024-10-01 09:42:00')
+
+ON DUPLICATE KEY UPDATE
+    question_text = VALUES(question_text),
+    question_type = VALUES(question_type),
+    category_key = VALUES(category_key),
+    is_required = VALUES(is_required),
+    max_length = VALUES(max_length);
+
+INSERT INTO question_library_options (id, library_question_id, option_text, option_value, order_index) VALUES
+    (1, 2, 'Her zaman', NULL, 1),
+    (2, 2, 'Cogu uygulamada', NULL, 2),
+    (3, 2, 'Nadiren', NULL, 3),
+    (4, 5, 'Aninda guvenlik ekibine bildiririm', NULL, 1),
+    (5, 5, 'Ekibime iletir ve teyit beklerim', NULL, 2),
+    (6, 5, 'Yanlislikla siler ya da yok sayarim', NULL, 3)
+
+ON DUPLICATE KEY UPDATE
+    library_question_id = VALUES(library_question_id),
+    option_text = VALUES(option_text),
+    option_value = VALUES(option_value),
+    order_index = VALUES(order_index);
+
 INSERT INTO survey_participants (id, survey_id, email, token, token_hash, invited_at, responded_at, created_at) VALUES
     (1, 1, 'ayse.security@acme.com', 'sec-2025-a1', 'bd78547e4e89f04e5a0653ea241828b8dcf4e95f10f0b75b744aab399f35b559', '2025-03-05 09:00:00', '2025-03-07 10:15:00', '2025-03-05 09:00:00'),
     (2, 1, 'berk.security@acme.com', 'sec-2025-b2', 'a7081ef29abbd113a8d404a706de996516db5d1ac536c0d31b332f3d5c5580a6', '2025-03-05 09:05:00', '2025-03-08 14:20:00', '2025-03-05 09:05:00'),
@@ -191,24 +241,25 @@ ON DUPLICATE KEY UPDATE
     participant_id = VALUES(participant_id),
     submitted_at = VALUES(submitted_at);
 
-INSERT INTO response_answers (id, response_id, question_id, option_id, answer_text, numeric_value, created_at) VALUES
-    (1, 1, 1, NULL, NULL, 4.0, '2025-03-07 10:15:00'),
-    (2, 1, 2, 1, NULL, NULL, '2025-03-07 10:15:00'),
-    (3, 1, 3, NULL, 'Uygulama envanteri icin rehber ve kontrol listesi istiyorum.', NULL, '2025-03-07 10:15:00'),
-    (4, 2, 1, NULL, NULL, 5.0, '2025-03-08 14:20:00'),
-    (5, 2, 2, 2, NULL, NULL, '2025-03-08 14:20:00'),
-    (6, 2, 3, NULL, 'Egitim kayitlarinin tekrarina hizli erisim ihtiyacim var.', NULL, '2025-03-08 14:20:00'),
-    (7, 3, 4, NULL, NULL, 4.0, '2024-11-18 16:45:00'),
-    (8, 3, 5, 4, NULL, NULL, '2024-11-18 16:45:00'),
-    (9, 3, 6, NULL, 'Simulasyon mailleri ile egitimler surdurulmeli.', NULL, '2024-11-18 16:45:00'),
-    (10, 4, 4, NULL, NULL, 3.0, '2024-11-20 09:30:00'),
-    (11, 4, 5, 6, NULL, NULL, '2024-11-20 09:30:00'),
-    (12, 4, 6, NULL, 'Ekip icinde hizli paylasim icin prosedur guncellenmeli.', NULL, '2024-11-20 09:30:00')
+INSERT INTO response_answers (id, response_id, question_id, option_id, type, answer_text, numeric_value, created_at) VALUES
+    (1, 1, 1, NULL, 'rating', NULL, 4.0, '2025-03-07 10:15:00'),
+    (2, 1, 2, 1, 'multiple_choice', NULL, NULL, '2025-03-07 10:15:00'),
+    (3, 1, 3, NULL, 'text', 'Uygulama envanteri icin rehber ve kontrol listesi istiyorum.', NULL, '2025-03-07 10:15:00'),
+    (4, 2, 1, NULL, 'rating', NULL, 5.0, '2025-03-08 14:20:00'),
+    (5, 2, 2, 2, 'multiple_choice', NULL, NULL, '2025-03-08 14:20:00'),
+    (6, 2, 3, NULL, 'text', 'Egitim kayitlarinin tekrarina hizli erisim ihtiyacim var.', NULL, '2025-03-08 14:20:00'),
+    (7, 3, 4, NULL, 'rating', NULL, 4.0, '2024-11-18 16:45:00'),
+    (8, 3, 5, 4, 'multiple_choice', NULL, NULL, '2024-11-18 16:45:00'),
+    (9, 3, 6, NULL, 'text', 'Simulasyon mailleri ile egitimler surdurulmeli.', NULL, '2024-11-18 16:45:00'),
+    (10, 4, 4, NULL, 'rating', NULL, 3.0, '2024-11-20 09:30:00'),
+    (11, 4, 5, 6, 'multiple_choice', NULL, NULL, '2024-11-20 09:30:00'),
+    (12, 4, 6, NULL, 'text', 'Ekip icinde hizli paylasim icin prosedur guncellenmeli.', NULL, '2024-11-20 09:30:00')
 
 ON DUPLICATE KEY UPDATE
     response_id = VALUES(response_id),
     question_id = VALUES(question_id),
     option_id = VALUES(option_id),
+    type = VALUES(type),
     answer_text = VALUES(answer_text),
     numeric_value = VALUES(numeric_value);
 

@@ -25,6 +25,131 @@ $databaseName = $dbConfig['database'] ?? '';
 $charset = $dbConfig['charset'] ?? 'utf8mb4';
 $collation = $dbConfig['collation'] ?? ($charset . '_unicode_ci');
 
+function ensureSchemaUpToDate(PDO $pdo, array &$logs, array &$errors): void
+{
+    try {
+        $tableExists = $pdo->query("SHOW TABLES LIKE 'survey_questions'")->fetch();
+        if (!$tableExists) {
+            return;
+        }
+
+        $columnExists = $pdo->query("SHOW COLUMNS FROM survey_questions LIKE 'category_key'")->fetch();
+        if (!$columnExists) {
+            $pdo->exec("ALTER TABLE survey_questions ADD COLUMN category_key VARCHAR(100) NULL DEFAULT NULL AFTER question_type");
+            $logs[] = 'survey_questions tablosuna category_key alani eklendi.';
+        } else {
+            $logs[] = 'survey_questions tablosundaki category_key alani guncel.';
+        }
+
+        $libraryExists = $pdo->query("SHOW TABLES LIKE 'question_library'")->fetch();
+        if (!$libraryExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE question_library (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    question_type ENUM('multiple_choice','rating','text') NOT NULL,
+    category_key VARCHAR(120) NULL,
+    is_required TINYINT(1) NOT NULL DEFAULT 0,
+    max_length INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'question_library tablosu olusturuldu.';
+        } else {
+            $logs[] = 'question_library tablosu mevcut.';
+        }
+
+        $libraryOptionsExists = $pdo->query("SHOW TABLES LIKE 'question_library_options'")->fetch();
+        if (!$libraryOptionsExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE question_library_options (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    library_question_id INT UNSIGNED NOT NULL,
+    option_text VARCHAR(255) NOT NULL,
+    option_value VARCHAR(100) NULL,
+    order_index INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_library_options_question FOREIGN KEY (library_question_id) REFERENCES question_library(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'question_library_options tablosu olusturuldu.';
+        } else {
+            $logs[] = 'question_library_options tablosu mevcut.';
+        }
+
+        if (!$libraryExists) {
+            $questions = $pdo->query('SELECT * FROM survey_questions ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+            if ($questions) {
+                $insertQuestion = $pdo->prepare(
+                    'INSERT INTO question_library (question_text, question_type, category_key, is_required, max_length, created_at)
+                     VALUES (?, ?, ?, ?, ?, NOW())'
+                );
+                $insertOption = $pdo->prepare(
+                    'INSERT INTO question_library_options (library_question_id, option_text, option_value, order_index)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $selectOptions = $pdo->prepare('SELECT * FROM question_options WHERE question_id = ? ORDER BY order_index ASC, id ASC');
+
+                foreach ($questions as $question) {
+                    $insertQuestion->execute([
+                        $question['question_text'],
+                        $question['question_type'],
+                        $question['category_key'] ?? null,
+                        $question['is_required'] ?? 0,
+                        $question['max_length'] ?? null,
+                    ]);
+                    $libraryId = (int)$pdo->lastInsertId();
+
+                    if ($question['question_type'] === 'multiple_choice') {
+                        $selectOptions->execute([$question['id']]);
+                        $order = 0;
+                        foreach ($selectOptions->fetchAll(PDO::FETCH_ASSOC) as $option) {
+                            $insertOption->execute([
+                                $libraryId,
+                                $option['option_text'],
+                                $option['option_value'] ?? null,
+                                $order++,
+                            ]);
+                        }
+                        $selectOptions->closeCursor();
+                    }
+                }
+
+                $logs[] = 'Mevcut sorular soru havuzuna kopyalandi.';
+            }
+        }
+
+        $responseAnswersExists = $pdo->query("SHOW TABLES LIKE 'response_answers'")->fetch();
+        if (!$responseAnswersExists) {
+            $pdo->exec(<<<SQL
+CREATE TABLE response_answers (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    response_id INT UNSIGNED NOT NULL,
+    question_id INT UNSIGNED NOT NULL,
+    option_id INT UNSIGNED NULL,
+    type ENUM('multiple_choice','rating','text') NULL,
+    answer_text TEXT NULL,
+    numeric_value DECIMAL(10,4) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_answers_response FOREIGN KEY (response_id) REFERENCES survey_responses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_answers_question FOREIGN KEY (question_id) REFERENCES survey_questions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_answers_option FOREIGN KEY (option_id) REFERENCES question_options(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL);
+            $logs[] = 'response_answers tablosu olusturuldu.';
+        } else {
+            $typeColumn = $pdo->query("SHOW COLUMNS FROM response_answers LIKE 'type'")->fetch();
+            if (!$typeColumn) {
+                $pdo->exec("ALTER TABLE response_answers ADD COLUMN type ENUM('multiple_choice','rating','text') NULL DEFAULT NULL AFTER option_id");
+                $logs[] = 'response_answers tablosuna type alani eklendi.';
+            } else {
+                $logs[] = 'response_answers tablosundaki type alani guncel.';
+            }
+        }
+    } catch (Throwable $e) {
+        $errors[] = 'Sema guncelleme hatasi: ' . $e->getMessage();
+    }
+}
+
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -33,6 +158,7 @@ $options = [
 
 $needsInstall = false;
 $hasTables = false;
+$pdo = null;
 
 try {
     $dsnWithDb = sprintf(
@@ -101,6 +227,29 @@ if ($needsInstall && empty($errors)) {
         $hasTables = true;
     } catch (Throwable $e) {
         $errors[] = 'Kurulum hatasi: ' . $e->getMessage();
+    }
+}
+
+if ($hasTables && empty($errors)) {
+    try {
+        if (!$pdo) {
+            $dsnWithDb = sprintf(
+                'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                $dbConfig['host'] ?? 'localhost',
+                $dbConfig['port'] ?? 3306,
+                $databaseName,
+                $charset
+            );
+            $pdo = new PDO($dsnWithDb, $dbConfig['username'] ?? '', $dbConfig['password'] ?? '', $options);
+        } else {
+            $pdo->exec('USE `' . str_replace('`', '``', $databaseName) . '`');
+        }
+    } catch (Throwable $e) {
+        $errors[] = 'Kurulum sonrasi baglanti hatasi: ' . $e->getMessage();
+    }
+
+    if ($pdo && empty($errors)) {
+        ensureSchemaUpToDate($pdo, $logs, $errors);
     }
 }
 

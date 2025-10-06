@@ -8,6 +8,7 @@ if (!$survey) {
     set_flash('danger', 'Anket bulunamadi.');
     redirect('surveys.php');
 }
+$pageTitle = 'Sorular - ' . ($survey['title'] ?? config('app.name', 'Anketor'));
 
 if (isset($_GET['delete_question'])) {
     $questionId = (int)$_GET['delete_question'];
@@ -22,6 +23,27 @@ if (is_post()) {
     guard_csrf();
     $action = $_POST['action'] ?? 'create';
 
+    if ($action === 'add_from_library') {
+        $libraryQuestionId = (int)($_POST['library_question_id'] ?? 0);
+        $orderIndex = isset($_POST['order_index']) && $_POST['order_index'] !== ''
+            ? (int)$_POST['order_index']
+            : null;
+
+        if ($libraryQuestionId <= 0) {
+            set_flash('danger', 'Lutfen hazir sorulardan birini secin.');
+            redirect('survey_questions.php?id=' . $surveyId);
+        }
+
+        try {
+            $surveyService->addQuestionFromLibrary($surveyId, $libraryQuestionId, $orderIndex);
+            set_flash('success', 'Hazır soru ankete eklendi.');
+        } catch (InvalidArgumentException $e) {
+            set_flash('danger', $e->getMessage());
+        }
+
+        redirect('survey_questions.php?id=' . $surveyId);
+    }
+
     if ($action === 'create') {
         $type = $_POST['question_type'] ?? 'text';
         $options = [];
@@ -35,14 +57,21 @@ if (is_post()) {
             }
         }
 
-        $surveyService->addQuestion($surveyId, [
+        $questionData = [
             'question_text' => trim($_POST['question_text'] ?? ''),
             'question_type' => $type,
+            'category_key' => ($categoryKey = trim($_POST['category_key'] ?? '')) !== '' ? $categoryKey : null,
             'is_required' => !empty($_POST['is_required']),
             'max_length' => $type === 'text' ? (int)($_POST['max_length'] ?? 0) : null,
             'order_index' => (int)($_POST['order_index'] ?? 0),
             'options' => $options,
-        ]);
+        ];
+
+        $surveyService->addQuestion($surveyId, $questionData);
+
+        if (!empty($_POST['save_to_library'])) {
+            $surveyService->addLibraryQuestion($questionData);
+        }
 
         set_flash('success', 'Soru eklendi.');
         redirect('survey_questions.php?id=' . $surveyId);
@@ -57,23 +86,80 @@ if (is_post()) {
 }
 
 $questions = $surveyService->getQuestions($surveyId);
+$libraryQuestions = $surveyService->getQuestionLibrary();
+$libraryByCategory = [];
+foreach ($libraryQuestions as $libraryQuestion) {
+    $groupKey = $libraryQuestion['category_key'] ?: 'Genel';
+    if (!isset($libraryByCategory[$groupKey])) {
+        $libraryByCategory[$groupKey] = [];
+    }
+    $libraryByCategory[$groupKey][] = $libraryQuestion;
+}
 $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
 <main class="container">
-    <div class="panel-header">
-        <h1>Sorular &raquo; <?php echo h($survey['title']); ?></h1>
-        <div class="inline-actions">
-            <a class="button-secondary" href="survey_edit.php?id=<?php echo (int)$survey['id']; ?>">Ayarlar</a>
-            <a class="button-secondary" href="participants.php?id=<?php echo (int)$survey['id']; ?>">Katilimcilar</a>
-            <a class="button-primary" href="answer_preview.php?id=<?php echo (int)$survey['id']; ?>" target="_blank">Anketi Gor</a>
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Soru Tasarımı</p>
+            <h1><?php echo h($survey['title']); ?></h1>
+            <p class="page-subtitle">Hazır soru havuzundan seçim yapın veya yeni sorular oluşturup AI önerileriyle zenginleştirin.</p>
         </div>
-    </div>
+        <div class="page-header__actions">
+            <a class="button-secondary" href="survey_edit.php?id=<?php echo (int)$survey['id']; ?>">Ayarlar</a>
+            <a class="button-secondary" href="participants.php?id=<?php echo (int)$survey['id']; ?>">Katılımcılar</a>
+            <a class="button-primary" href="answer_preview.php?id=<?php echo (int)$survey['id']; ?>" target="_blank">Anketi Gör</a>
+        </div>
+    </header>
 
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
     <?php endif; ?>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>Hazır Sorudan Ekle</h2>
+        </div>
+        <div class="panel-body">
+            <?php if (empty($libraryQuestions)): ?>
+                <p>Henüz soru havuzunda kayıt bulunmuyor. Yeni sorular oluştururken "Soru havuzuna ekle" seçeneğini kullanabilirsiniz.</p>
+            <?php else: ?>
+                <form method="POST" class="form-horizontal">
+                    <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+                    <input type="hidden" name="action" value="add_from_library">
+                    <div class="form-group">
+                        <label for="library_question_id">Hazır Soru</label>
+                        <select id="library_question_id" name="library_question_id" required>
+                            <option value="">Bir soru seçin</option>
+                            <?php foreach ($libraryByCategory as $group => $items): ?>
+                                <optgroup label="<?php echo h(str_replace('_', ' ', ucfirst($group))); ?>">
+                                    <?php foreach ($items as $item): ?>
+                                        <?php
+                                        $label = $item['question_text'];
+                                        if (function_exists('mb_strimwidth')) {
+                                            $label = mb_strimwidth($label, 0, 120, '...');
+                                        } elseif (strlen($label) > 120) {
+                                            $label = substr($label, 0, 117) . '...';
+                                        }
+                                        ?>
+                                        <option value="<?php echo (int)$item['id']; ?>"><?php echo h($label); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="library_order_index">Sırası</label>
+                        <input type="number" id="library_order_index" name="order_index" value="<?php echo count($questions); ?>" min="0">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="button-primary">Hazır Soruyu Ekle</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </section>
 
     <section class="panel">
         <div class="panel-header">
@@ -91,18 +177,18 @@ include __DIR__ . '/templates/navbar.php';
                     <div class="form-group">
                         <label for="question_type">Soru Tipi</label>
                         <select id="question_type" name="question_type">
-                            <option value="multiple_choice">Coktan Secmeli</option>
+                            <option value="multiple_choice">Çoktan Seçmeli</option>
                             <option value="rating">1-5 Dereceleme</option>
-                            <option value="text">Acik Uclu</option>
+                            <option value="text">Açık Uçlu</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="category_key">Kategori Anahtari</label>
+                        <label for="category_key">Kategori Anahtarı</label>
                         <input type="text" id="category_key" name="category_key" placeholder="web_guvenligi">
-                        <small class="help-text">Raporlamada kullanilacak kisa anahtar. Orn: web_guvenligi</small>
+                        <small class="help-text">Raporlamada kullanılacak kısa anahtar. Örn: web_guvenligi</small>
                     </div>
                     <div class="form-group">
-                        <label for="order_index">Sirasi</label>
+                        <label for="order_index">Sırası</label>
                         <input type="number" id="order_index" name="order_index" value="<?php echo count($questions); ?>" min="0">
                     </div>
                     <div class="form-group">
@@ -114,11 +200,17 @@ include __DIR__ . '/templates/navbar.php';
                             <input type="checkbox" name="is_required" value="1"> Zorunlu soru
                         </label>
                     </div>
+                    <div class="form-group checkbox">
+                        <label>
+                            <input type="checkbox" name="save_to_library" value="1"> Soru havuzuna ekle
+                        </label>
+                        <small class="help-text">Secerseniz soru ve secenekleri ayni kategori anahtariyla hazir sorulara eklenir.</small>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="options">Secenekler (her satira bir)</label>
+                    <label for="options">Seçenekler (her satıra bir)</label>
                     <textarea id="options" name="options" rows="4" placeholder="Evet\nHayir\nKismi"></textarea>
-                    <small class="help-text">Yalnizca coktan secmeli sorular icin kullanilir.</small>
+                    <small class="help-text">Yalnızca coktan secmeli sorular icin kullanilir.</small>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="button-primary">Soru Ekle</button>
@@ -129,7 +221,7 @@ include __DIR__ . '/templates/navbar.php';
 
     <section class="panel">
         <div class="panel-header">
-            <h2>AI Soru Onerisi</h2>
+            <h2>AI Soru Önerisi</h2>
         </div>
         <div class="panel-body">
             <form method="POST" class="inline-form">
@@ -137,14 +229,14 @@ include __DIR__ . '/templates/navbar.php';
                 <input type="hidden" name="action" value="ai_suggest">
                 <label for="topic">Tema</label>
                 <input type="text" id="topic" name="topic" placeholder="Orn: Calisan bagliligi" required>
-                <button type="submit" class="button-secondary">Oneri Al</button>
+                <button type="submit" class="button-secondary">Öneri Al</button>
                 <?php if (!$surveyService->aiClient()->isEnabled()): ?>
                     <span class="tag">Demo modu</span>
                 <?php endif; ?>
             </form>
             <?php if (!empty($aiSuggestions)): ?>
                 <div class="suggestions">
-                    <h3>Onerilen sorular</h3>
+                    <h3>Önerilen sorular</h3>
                     <ul>
                         <?php foreach ($aiSuggestions as $suggestion): ?>
                             <li>
@@ -170,7 +262,7 @@ include __DIR__ . '/templates/navbar.php';
         </div>
         <div class="panel-body">
             <?php if (empty($questions)): ?>
-                <p>Bu ankette henuz soru yok.</p>
+                <p>Bu ankette henüz soru yok.</p>
             <?php else: ?>
                 <ul class="question-list">
                     <?php foreach ($questions as $question): ?>

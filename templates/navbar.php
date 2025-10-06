@@ -5,10 +5,11 @@
         <li><a class="<?php echo active_nav('dashboard.php'); ?>" href="dashboard.php">Ana Sayfa</a></li>
         <li><a class="<?php echo active_nav('surveys.php'); ?>" href="surveys.php">Anketler</a></li>
         <li><a class="<?php echo active_nav('reports.php'); ?>" href="reports.php">Raporlar</a></li>
+        <li><a class="<?php echo active_nav('users.php'); ?>" href="users.php">Kullanıcılar</a></li>
     </ul>
     <div class="user-meta">
         <span><?php echo h(current_user_name()); ?></span>
-        <a class="button-secondary" href="logout.php">Cikis</a>
+        <a class="button-secondary" href="logout.php">Çıkış</a>
     </div>
 </nav>
 <?php endif; ?>

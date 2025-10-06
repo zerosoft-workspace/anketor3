@@ -5,13 +5,16 @@ require_login();
 $surveyId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $survey = $surveyService->getSurvey($surveyId);
 if (!$survey) {
-    set_flash('danger', 'Anket bulunamadi.');
+    set_flash('danger', 'Anket bulunamadı.');
     redirect('surveys.php');
 }
+$pageTitle = 'Anket Raporu - ' . ($survey['title'] ?? config('app.name', 'Anketor'));
 
 if (is_post()) {
     guard_csrf();
-    if (($_POST['action'] ?? '') === 'smart_report') {
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'smart_report') {
         $analytics = get_survey_analytics($db, $surveyId);
         $payload = [
             'survey' => $survey,
@@ -22,13 +25,38 @@ if (is_post()) {
         ];
         $aiReport = $surveyService->aiClient()->generateSmartReport($payload);
         $surveyService->recordReport($surveyId, 'smart', ['content' => $aiReport]);
-        set_flash('success', 'Akilli rapor olusturuldu.');
+        set_flash('success', 'Akıllı rapor oluşturuldu.');
+        redirect('survey_reports.php?id=' . $surveyId);
+    }
+
+    if ($action === 'save_manual') {
+        $prompt = trim($_POST['prompt'] ?? '');
+        $suggestion = trim($_POST['suggestion'] ?? '');
+
+        if ($suggestion === '') {
+            set_flash('danger', 'AI bilgi kaydını oluşturmak için en azından öneriyi yazmanız gerekiyor.');
+        } else {
+            $surveyService->addAISuggestion($surveyId, $prompt, $suggestion);
+            set_flash('success', 'AI bilgi bankasına yeni kayıt eklendi.');
+        }
+
+        redirect('survey_reports.php?id=' . $surveyId);
+    }
+
+    if ($action === 'delete_manual') {
+        $suggestionId = (int)($_POST['suggestion_id'] ?? 0);
+        if ($suggestionId > 0) {
+            $surveyService->deleteAISuggestion($surveyId, $suggestionId);
+            set_flash('success', 'Kayıt kaldırıldı.');
+        }
+
         redirect('survey_reports.php?id=' . $surveyId);
     }
 }
 
 $analytics = get_survey_analytics($db, $surveyId);
 $smartReports = $surveyService->getReports($surveyId, 'smart');
+$manualSuggestions = $surveyService->getAISuggestions($surveyId);
 
 $trendData = [];
 if (!empty($survey['category_id'])) {
@@ -56,15 +84,19 @@ include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
 <main class="container">
-    <div class="panel-header">
-        <h1>Rapor &raquo; <?php echo h($survey['title']); ?></h1>
-        <div class="inline-actions">
-            <a class="button-secondary" href="surveys.php">Anketlere Don</a>
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Raporlama</p>
+            <h1><?php echo h($survey['title']); ?></h1>
+            <p class="page-subtitle">Katılımcı yanıtları, trend analizleri ve AI önerileri tek ekranda.</p>
+        </div>
+        <div class="page-header__actions">
+            <a class="button-secondary" href="surveys.php">Anketlere Dön</a>
             <a class="button-secondary" href="export_excel.php?survey_id=<?php echo $surveyId; ?>" target="_blank">Excel</a>
             <a class="button-secondary" href="export_pdf.php?survey_id=<?php echo $surveyId; ?>" target="_blank">PDF</a>
             <a class="button-secondary" href="export_chart.php?survey_id=<?php echo $surveyId; ?>" target="_blank">Grafik</a>
         </div>
-    </div>
+    </header>
 
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
@@ -76,18 +108,18 @@ include __DIR__ . '/templates/navbar.php';
             <span class="stat-value"><?php echo (int)($analytics['totals']['responses'] ?? 0); ?></span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Katilimci</span>
+            <span class="stat-label">Katılımcı</span>
             <span class="stat-value"><?php echo (int)($analytics['totals']['participants'] ?? 0); ?></span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Son Kayit</span>
+            <span class="stat-label">Son Kayıt</span>
             <span class="stat-value"><?php echo !empty($analytics['totals']['last_response']) ? h(format_date($analytics['totals']['last_response'], 'd.m.Y H:i')) : '-'; ?></span>
         </div>
     </section>
 
     <section class="panel">
         <div class="panel-header">
-            <h2>Soru Bazli Sonuclar</h2>
+            <h2>Soru Bazlı Sonuçlar</h2>
         </div>
         <div class="panel-body">
             <?php foreach ($analytics['questions'] as $question): ?>
@@ -101,7 +133,7 @@ include __DIR__ . '/templates/navbar.php';
                     <?php elseif ($question['type'] === 'multiple_choice'): ?>
                         <ul class="option-list">
                             <?php foreach ($question['distribution'] as $dist): ?>
-                                <li><?php echo h($dist['label']); ?> � <?php echo (int)$dist['count']; ?> cevap (%<?php echo $dist['percent']; ?>)</li>
+                                <li><?php echo h($dist['label']); ?> - <?php echo (int)$dist['count']; ?> cevap (%<?php echo $dist['percent']; ?>)</li>
                             <?php endforeach; ?>
                         </ul>
                     <?php else: ?>
@@ -113,7 +145,7 @@ include __DIR__ . '/templates/navbar.php';
                                 <?php endforeach; ?>
                             </ul>
                         <?php else: ?>
-                            <p>Yanit bulunmuyor.</p>
+                            <p>Yanıt bulunmuyor.</p>
                         <?php endif; ?>
                     <?php endif; ?>
                 </article>
@@ -141,7 +173,7 @@ include __DIR__ . '/templates/navbar.php';
     <?php if ($trendData): ?>
         <section class="panel">
             <div class="panel-header">
-                <h2>Trend Karsilastirma</h2>
+                <h2>Trend Karşılaştırma</h2>
             </div>
             <div class="panel-body">
                 <table class="table">
@@ -173,7 +205,7 @@ include __DIR__ . '/templates/navbar.php';
 
     <section class="panel">
         <div class="panel-header">
-            <h2>Akilli Rapor</h2>
+            <h2>Akıllı Rapor</h2>
             <form method="POST">
                 <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
                 <input type="hidden" name="action" value="smart_report">
@@ -187,7 +219,52 @@ include __DIR__ . '/templates/navbar.php';
                     <p class="help-text">Olusturulma: <?php echo h($smartReports[0]['created_at']); ?></p>
                 </article>
             <?php else: ?>
-                <p>Henuz akilli rapor olusturulmadi.</p>
+                <p>Henüz akıllı rapor oluşturulmadı.</p>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>AI Bilgi Bankası</h2>
+        </div>
+        <div class="panel-body">
+            <form method="POST" class="stacked-form">
+                <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+                <input type="hidden" name="action" value="save_manual">
+                <div class="form-group">
+                    <label for="prompt">Açıklama / Başlık</label>
+                    <input type="text" id="prompt" name="prompt" placeholder="Örn: Web Güvenliği için özelleştirilmiş not">
+                </div>
+                <div class="form-group">
+                    <label for="suggestion">AI Önerisi</label>
+                    <textarea id="suggestion" name="suggestion" rows="4" placeholder="Kendi uzman önerilerinizi ekleyin"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button-secondary">Bilgiyi Kaydet</button>
+                </div>
+            </form>
+
+            <?php if ($manualSuggestions): ?>
+                <ul class="knowledge-list">
+                    <?php foreach ($manualSuggestions as $item): ?>
+                        <li class="knowledge-item">
+                            <header>
+                                <strong><?php echo h($item['prompt'] ?: 'Serbest not'); ?></strong>
+                                <span class="help-text"><?php echo h(format_date($item['created_at'], 'd.m.Y H:i')); ?></span>
+                            </header>
+                            <p><?php echo nl2br(h($item['suggestion'])); ?></p>
+                            <form method="POST" class="inline-form">
+                                <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+                                <input type="hidden" name="action" value="delete_manual">
+                                <input type="hidden" name="suggestion_id" value="<?php echo (int)$item['id']; ?>">
+                                <button type="submit" class="button-link text-danger" onclick="return confirm('Kaydı silmek istediğinizden emin misiniz?');">Sil</button>
+                            </form>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p class="help-text">Henüz manuel bilgi eklenmedi. Yukaridaki form ile AI raporlarina dahil edilecek temel bilgileri paylasabilirsiniz.</p>
             <?php endif; ?>
         </div>
     </section>

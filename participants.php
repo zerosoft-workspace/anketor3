@@ -5,9 +5,11 @@ require_login();
 $surveyId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $survey = $surveyService->getSurvey($surveyId);
 if (!$survey) {
-    set_flash('danger', 'Anket bulunamadi.');
+    set_flash('danger', 'Anket bulunamadı.');
     redirect('surveys.php');
 }
+
+$pageTitle = 'Katılımcılar - ' . ($survey['title'] ?? config('app.name', 'Anketor'));
 
 if (isset($_GET['send'])) {
     $participantId = (int)$_GET['send'];
@@ -37,71 +39,121 @@ if (is_post()) {
             $added++;
         }
     }
-    set_flash('success', "$added katilimci eklendi.");
+    set_flash('success', "$added katılımcı eklendi.");
     redirect('participants.php?id=' . $surveyId);
 }
 
 $participants = $surveyService->getParticipants($surveyId);
+$totalParticipants = count($participants);
+$completed = 0;
+foreach ($participants as $participant) {
+    if (!empty($participant['responded_at'])) {
+        $completed++;
+    }
+}
+$pendingCount = $totalParticipants - $completed;
+$completionRate = $totalParticipants > 0 ? round(($completed / $totalParticipants) * 100) : 0;
 $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
 <main class="container">
-    <div class="panel-header">
-        <h1>Katilimcilar &raquo; <?php echo h($survey['title']); ?></h1>
-        <a class="button-secondary" href="survey_questions.php?id=<?php echo $surveyId; ?>">Sorular</a>
-    </div>
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Katılımcılar</p>
+            <h1><?php echo h($survey['title']); ?></h1>
+            <p class="page-subtitle">Anket bağlantısını paylaşın, davetleri takip edin ve kişisel raporları tek noktadan yönetin.</p>
+        </div>
+        <div class="page-header__actions">
+            <a class="button-secondary" href="survey_questions.php?id=<?php echo $surveyId; ?>">Sorular</a>
+            <a class="button-secondary" href="survey_reports.php?id=<?php echo $surveyId; ?>">Raporlar</a>
+        </div>
+    </header>
 
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
     <?php endif; ?>
 
+    <section class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-label">Toplam Davet</span>
+            <span class="stat-value"><?php echo $totalParticipants; ?></span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Tamamlanan</span>
+            <span class="stat-value"><?php echo $completed; ?></span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Bekleyen</span>
+            <span class="stat-value"><?php echo $pendingCount; ?></span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Tamamlanma Oranı</span>
+            <span class="stat-value"><?php echo $totalParticipants ? $completionRate . '%': 'N/A'; ?></span>
+        </div>
+    </section>
+
     <section class="panel">
         <div class="panel-header">
-            <h2>Katilimci Ekle</h2>
+            <h2>Yeni Katılımcı Ekle</h2>
         </div>
         <div class="panel-body">
             <form method="POST">
                 <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
                 <div class="form-group">
                     <label for="emails">E-posta adresleri</label>
-                    <textarea id="emails" name="emails" rows="4" placeholder="her satira bir e-posta"></textarea>
+                    <textarea id="emails" name="emails" rows="4" placeholder="Her satıra bir e-posta yazın"></textarea>
+                    <small class="help-text">Eklenen katılımcılar otomatik olarak benzersiz link alır. Dilerseniz bağlantıları aşağıdaki listeden kopyalayabilirsiniz.</small>
                 </div>
-                <button type="submit" class="button-primary">Katilimcilari Kaydet</button>
+                <div class="form-actions">
+                    <button type="submit" class="button-primary">Katılımcıları Kaydet</button>
+                </div>
             </form>
         </div>
     </section>
 
     <section class="panel">
         <div class="panel-header">
-            <h2>Liste</h2>
+            <h2>Kayıtlı Katılımcılar</h2>
         </div>
         <div class="panel-body">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>E-posta</th>
-                        <th>Davet</th>
-                        <th>Durum</th>
-                        <th>Link</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($participants as $participant): ?>
-                        <?php $link = base_url('answer.php?id=' . $surveyId . '&token=' . urlencode($participant['token'])); ?>
+            <?php if (empty($participants)): ?>
+                <p>Henüz davet gönderilmedi. Listeniz burada görünecek.</p>
+            <?php else: ?>
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td><?php echo h($participant['email']); ?></td>
-                            <td><?php echo $participant['invited_at'] ? h(format_date($participant['invited_at'], 'd.m.Y H:i')) : '-'; ?></td>
-                            <td><?php echo $participant['responded_at'] ? '<span class="status status-active">Tamamlandi</span>' : '<span class="status status-draft">Bekliyor</span>'; ?></td>
-                            <td><input type="text" readonly value="<?php echo h($link); ?>" onclick="this.select();"></td>
-                            <td>
-                                <a class="button-link" href="participants.php?id=<?php echo $surveyId; ?>&send=<?php echo (int)$participant['id']; ?>">E-posta Gonder</a>
-                            </td>
+                            <th>E-posta</th>
+                            <th>Davet</th>
+                            <th>Durum</th>
+                            <th>Link</th>
+                            <th>Rapor</th>
+                            <th></th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($participants as $participant): ?>
+                            <?php $link = base_url('answer.php?id=' . $surveyId . '&token=' . urlencode($participant['token'])); ?>
+                            <tr>
+                                <td><?php echo h($participant['email']); ?></td>
+                                <td><?php echo $participant['invited_at'] ? h(format_date($participant['invited_at'], 'd.m.Y H:i')) : '-'; ?></td>
+                                <td><?php echo $participant['responded_at'] ? '<span class="status status-active">Tamamlandı</span>' : '<span class="status status-draft">Bekliyor</span>'; ?></td>
+                                <td><input type="text" readonly value="<?php echo h($link); ?>" onclick="this.select();"></td>
+                                <td>
+                                    <?php if (!empty($participant['response_id'])): ?>
+                                        <a class="button-link" href="personal_report.php?response=<?php echo (int)$participant['response_id']; ?>">Raporu Gör</a>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a class="button-link" href="participants.php?id=<?php echo $surveyId; ?>&send=<?php echo (int)$participant['id']; ?>">E-posta Gönder</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
         </div>
     </section>
 </main>

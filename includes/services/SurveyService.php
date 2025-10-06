@@ -4,6 +4,7 @@ class SurveyService
     private $db;
     private $config;
     private $aiClient;
+    private $responseAnswersHasTypeColumn = null;
 
     public function __construct(Database $db, array $config)
     {
@@ -121,6 +122,95 @@ class SurveyService
         return $questions;
     }
 
+    public function getQuestionLibrary(?string $categoryKey = null): array
+    {
+        $params = [];
+        $sql = 'SELECT * FROM question_library';
+        if ($categoryKey !== null && $categoryKey !== '') {
+            $sql .= ' WHERE category_key = ?';
+            $params[] = $categoryKey;
+        }
+        $sql .= ' ORDER BY (category_key IS NULL) ASC, category_key ASC, question_text ASC';
+
+        $questions = $this->db->fetchAll($sql, $params);
+        foreach ($questions as &$question) {
+            if ($question['question_type'] === 'multiple_choice') {
+                $question['options'] = $this->db->fetchAll(
+                    'SELECT * FROM question_library_options WHERE library_question_id = ? ORDER BY order_index ASC, id ASC',
+                    [$question['id']]
+                );
+            }
+        }
+
+        return $questions;
+    }
+
+    public function getLibraryQuestion(int $questionId): array
+    {
+        $question = $this->db->fetch('SELECT * FROM question_library WHERE id = ?', [$questionId]);
+        if (!$question) {
+            return [];
+        }
+
+        if ($question['question_type'] === 'multiple_choice') {
+            $question['options'] = $this->db->fetchAll(
+                'SELECT * FROM question_library_options WHERE library_question_id = ? ORDER BY order_index ASC, id ASC',
+                [$questionId]
+            );
+        }
+
+        return $question;
+    }
+
+    public function addLibraryQuestion(array $data): int
+    {
+        $questionId = $this->db->insert(
+            'INSERT INTO question_library (question_text, question_type, category_key, is_required, max_length)
+             VALUES (?, ?, ?, ?, ?)',
+            [
+                $data['question_text'],
+                $data['question_type'],
+                $data['category_key'] ?? null,
+                !empty($data['is_required']) ? 1 : 0,
+                $data['max_length'] ?? null,
+            ]
+        );
+
+        if (!empty($data['options']) && is_array($data['options'])) {
+            $this->saveLibraryOptions($questionId, $data['options']);
+        }
+
+        return $questionId;
+    }
+
+    public function addQuestionFromLibrary(int $surveyId, int $libraryQuestionId, ?int $orderIndex = null): int
+    {
+        $libraryQuestion = $this->getLibraryQuestion($libraryQuestionId);
+        if (empty($libraryQuestion)) {
+            throw new InvalidArgumentException('Soru havuzunda eslesen kayit bulunamadi.');
+        }
+
+        $options = [];
+        if (!empty($libraryQuestion['options']) && is_array($libraryQuestion['options'])) {
+            foreach ($libraryQuestion['options'] as $option) {
+                $options[] = [
+                    'text' => $option['option_text'],
+                    'value' => $option['option_value'],
+                ];
+            }
+        }
+
+        return $this->addQuestion($surveyId, [
+            'question_text' => $libraryQuestion['question_text'],
+            'question_type' => $libraryQuestion['question_type'],
+            'category_key' => $libraryQuestion['category_key'] ?? null,
+            'is_required' => !empty($libraryQuestion['is_required']),
+            'max_length' => $libraryQuestion['max_length'] ?? null,
+            'order_index' => $orderIndex ?? 0,
+            'options' => $options,
+        ]);
+    }
+
     public function addQuestion(int $surveyId, array $data): int
     {
         $questionId = $this->db->insert(
@@ -130,6 +220,7 @@ class SurveyService
                 $surveyId,
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -151,6 +242,7 @@ class SurveyService
             [
                 $data['question_text'],
                 $data['question_type'],
+                $data['category_key'] ?? null,
                 !empty($data['is_required']) ? 1 : 0,
                 $data['max_length'] ?? null,
                 $data['order_index'] ?? 0,
@@ -171,6 +263,24 @@ class SurveyService
         return $this->db->execute('DELETE FROM survey_questions WHERE id = ?', [$questionId]);
     }
 
+    private function saveLibraryOptions(int $libraryQuestionId, array $options): void
+    {
+        $index = 0;
+        foreach ($options as $option) {
+            $text = is_array($option) ? ($option['text'] ?? '') : $option;
+            $value = is_array($option) ? ($option['value'] ?? null) : null;
+            if (trim($text) === '') {
+                continue;
+            }
+
+            $this->db->insert(
+                'INSERT INTO question_library_options (library_question_id, option_text, option_value, order_index)
+                 VALUES (?, ?, ?, ?)',
+                [$libraryQuestionId, $text, $value, $index++]
+            );
+        }
+    }
+
     private function saveOptions(int $questionId, array $options): void
     {
         $index = 0;
@@ -188,10 +298,48 @@ class SurveyService
         }
     }
 
+    private function responseAnswersHasTypeColumn(): bool
+    {
+        if ($this->responseAnswersHasTypeColumn === null) {
+            try {
+                $column = $this->db->fetch("SHOW COLUMNS FROM response_answers LIKE 'type'");
+                $this->responseAnswersHasTypeColumn = $column ? true : false;
+            } catch (\Throwable $e) {
+                $this->responseAnswersHasTypeColumn = false;
+            }
+        }
+
+        return $this->responseAnswersHasTypeColumn;
+    }
+
+    private function getQuestionTypeMap(int $surveyId): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT id, question_type FROM survey_questions WHERE survey_id = ?',
+            [$surveyId]
+        );
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int)$row['id']] = $row['question_type'];
+        }
+
+        return $map;
+    }
+
     public function getParticipants(int $surveyId): array
     {
         return $this->db->fetchAll(
-            'SELECT * FROM survey_participants WHERE survey_id = ? ORDER BY created_at DESC',
+            'SELECT sp.*, (
+                 SELECT sr.id
+                 FROM survey_responses sr
+                 WHERE sr.participant_id = sp.id
+                 ORDER BY sr.submitted_at DESC, sr.id DESC
+                 LIMIT 1
+             ) AS response_id
+             FROM survey_participants sp
+             WHERE sp.survey_id = ?
+             ORDER BY sp.created_at DESC',
             [$surveyId]
         );
     }
@@ -235,20 +383,49 @@ class SurveyService
             [$surveyId, $participantId]
         );
 
+        $hasTypeColumn = $this->responseAnswersHasTypeColumn();
+        $questionTypes = [];
+
+        if ($hasTypeColumn) {
+            $questionTypes = $this->getQuestionTypeMap($surveyId);
+        }
+
         foreach ($answers as $answer) {
             $questionId = (int)($answer['question_id'] ?? 0);
             if (!$questionId) {
                 continue;
             }
-            $optionId = $answer['option_id'] ?: null;
+            $optionId = $answer['option_id'] ?? null;
+            if ($optionId !== null) {
+                $optionId = (int)$optionId ?: null;
+            }
             $text = $answer['answer_text'] ?? null;
             $numeric = $answer['numeric_value'] ?? null;
 
-            $this->db->insert(
-                'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value)
-                 VALUES (?, ?, ?, ?, ?)',
-                [$responseId, $questionId, $optionId, $text, $numeric]
-            );
+            if ($hasTypeColumn) {
+                $questionType = $questionTypes[$questionId] ?? null;
+                if (!$questionType) {
+                    if ($numeric !== null) {
+                        $questionType = 'rating';
+                    } elseif ($optionId !== null) {
+                        $questionType = 'multiple_choice';
+                    } else {
+                        $questionType = 'text';
+                    }
+                }
+
+                $this->db->insert(
+                    'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value, type)
+                     VALUES (?, ?, ?, ?, ?, ?)',
+                    [$responseId, $questionId, $optionId, $text, $numeric, $questionType]
+                );
+            } else {
+                $this->db->insert(
+                    'INSERT INTO response_answers (response_id, question_id, option_id, answer_text, numeric_value)
+                     VALUES (?, ?, ?, ?, ?)',
+                    [$responseId, $questionId, $optionId, $text, $numeric]
+                );
+            }
         }
 
         if ($participantId) {
@@ -318,6 +495,7 @@ class SurveyService
             $this->addQuestion($newSurveyId, [
                 'question_text' => $question['question_text'],
                 'question_type' => $question['question_type'],
+                'category_key' => $question['category_key'] ?? null,
                 'is_required' => $question['is_required'],
                 'max_length' => $question['max_length'],
                 'order_index' => $question['order_index'],
@@ -333,6 +511,30 @@ class SurveyService
         return $this->db->insert(
             'INSERT INTO survey_reports (survey_id, report_type, payload) VALUES (?, ?, ?)',
             [$surveyId, $type, json_encode($payload, JSON_UNESCAPED_UNICODE)]
+        );
+    }
+
+    public function getAISuggestions(int $surveyId): array
+    {
+        return $this->db->fetchAll(
+            'SELECT * FROM survey_ai_suggestions WHERE survey_id = ? ORDER BY created_at DESC',
+            [$surveyId]
+        );
+    }
+
+    public function addAISuggestion(int $surveyId, string $prompt, string $suggestion): int
+    {
+        return $this->db->insert(
+            'INSERT INTO survey_ai_suggestions (survey_id, prompt, suggestion) VALUES (?, ?, ?)',
+            [$surveyId, $prompt, $suggestion]
+        );
+    }
+
+    public function deleteAISuggestion(int $surveyId, int $suggestionId): bool
+    {
+        return (bool)$this->db->execute(
+            'DELETE FROM survey_ai_suggestions WHERE survey_id = ? AND id = ?',
+            [$surveyId, $suggestionId]
         );
     }
 
@@ -376,7 +578,7 @@ class SurveyService
         }
 
         $answerRows = $this->db->fetchAll(
-            'SELECT ra.*, sq.question_text, sq.question_type, sq.category_key, sq.order_index,
+            'SELECT ra.*, sq.question_text, COALESCE(sq.question_type, ra.type) AS question_type, sq.category_key, sq.order_index,
                     qo.option_text
              FROM response_answers ra
              INNER JOIN survey_questions sq ON sq.id = ra.question_id
@@ -433,6 +635,15 @@ class SurveyService
         ];
 
         $report['advice'] = $this->aiClient()->generatePersonalAdvice($payload);
+        $manual = $this->getAISuggestions((int)$report['survey']['id']);
+        $report['manual_suggestions'] = array_map(function (array $item) {
+            return [
+                'id' => (int)$item['id'],
+                'prompt' => $item['prompt'],
+                'suggestion' => $item['suggestion'],
+                'created_at' => $item['created_at'],
+            ];
+        }, $manual);
 
         return $report;
     }

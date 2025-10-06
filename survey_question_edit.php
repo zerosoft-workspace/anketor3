@@ -28,6 +28,7 @@ if (is_post()) {
     $surveyService->updateQuestion($questionId, [
         'question_text' => trim($_POST['question_text'] ?? ''),
         'question_type' => $type,
+        'category_key' => ($categoryKey = trim($_POST['category_key'] ?? '')) !== '' ? $categoryKey : null,
         'is_required' => !empty($_POST['is_required']),
         'max_length' => $type === 'text' ? (int)($_POST['max_length'] ?? 0) : null,
         'order_index' => (int)($_POST['order_index'] ?? 0),
