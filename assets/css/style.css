@@ -40,6 +40,78 @@ a:hover {
     padding: 0 1.5rem;
 }
 
+.page {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 60px);
+}
+
+.page-hero {
+    position: relative;
+    background: radial-gradient(circle at 12% 20%, rgba(60, 109, 240, 0.18), transparent 55%),
+        linear-gradient(135deg, rgba(60, 109, 240, 0.12), rgba(255, 255, 255, 0.1));
+    padding: 4rem 0 3.5rem;
+    margin-bottom: -2.5rem;
+    overflow: hidden;
+}
+
+.page-hero::after {
+    content: '';
+    position: absolute;
+    inset: auto -15% -45% auto;
+    width: 340px;
+    height: 340px;
+    background: radial-gradient(circle, rgba(60, 109, 240, 0.22), transparent 70%);
+    filter: blur(2px);
+    opacity: 0.8;
+}
+
+.page-hero__content {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.page-hero__text {
+    max-width: 540px;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.page-hero__eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: rgba(31, 41, 51, 0.7);
+    font-weight: 600;
+}
+
+.page-hero__title {
+    margin: 0;
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    color: var(--color-text);
+}
+
+.page-hero__subtitle {
+    margin: 0;
+    font-size: 1rem;
+    color: rgba(31, 41, 51, 0.75);
+}
+
+.page-hero__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.page--surveys > .container {
+    margin-top: 3.5rem;
+    margin-bottom: 3rem;
+}
+
 .top-nav {
     display: flex;
     align-items: center;
@@ -605,103 +677,104 @@ textarea {
     margin: 0;
 }
 
-.survey-insights {
+.insight-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1.2rem;
+    margin: 0 0 2.5rem;
 }
 
 .insight-card {
     position: relative;
-    background: linear-gradient(135deg, rgba(60, 109, 240, 0.12), rgba(255, 255, 255, 0.95));
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
-    display: grid;
-    gap: 0.35rem;
-    overflow: hidden;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 18px;
+    padding: 1.75rem;
+    border: 1px solid rgba(60, 109, 240, 0.08);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
 }
 
-.insight-card::after {
-    content: '';
-    position: absolute;
-    inset: auto -40% -40% auto;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle at center, rgba(60, 109, 240, 0.18), transparent 60%);
-    transform: rotate(25deg);
+.insight-card__meta {
+    display: grid;
+    gap: 0.35rem;
 }
 
 .insight-card__label {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--color-muted);
-    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: rgba(31, 41, 51, 0.6);
+    font-weight: 700;
 }
 
 .insight-card__value {
-    font-size: 2rem;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
     font-weight: 700;
     color: var(--color-text);
 }
 
 .insight-card__hint {
-    font-size: 0.9rem;
-    color: var(--color-muted);
+    font-size: 0.85rem;
+    color: rgba(31, 41, 51, 0.6);
 }
 
 .survey-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.75rem;
 }
 
 .survey-card {
     background: rgba(255, 255, 255, 0.95);
-    border-radius: var(--radius);
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
     padding: 1.75rem;
-    box-shadow: var(--shadow);
+    box-shadow: 0 14px 38px rgba(15, 23, 42, 0.12);
     display: grid;
     gap: 1.5rem;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(60, 109, 240, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.survey-card::before {
+.survey-card::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(60, 109, 240, 0.08), transparent 55%);
+    inset: -45% 45% auto auto;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(60, 109, 240, 0.18), transparent 65%);
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.25s ease;
 }
 
 .survey-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 35px rgba(60, 109, 240, 0.18);
+    transform: translateY(-6px);
+    border-color: rgba(60, 109, 240, 0.35);
+    box-shadow: 0 24px 44px rgba(15, 23, 42, 0.18);
 }
 
-.survey-card:hover::before {
+.survey-card:hover::after {
     opacity: 1;
 }
 
-.survey-card > * {
-    position: relative;
-    z-index: 1;
+.survey-card__body {
+    display: grid;
+    gap: 1rem;
 }
 
 .survey-card__header {
     display: grid;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
-.survey-card__header h2 {
-    margin: 0.5rem 0 0.75rem;
-    font-size: 1.2rem;
+.survey-card__title {
+    margin: 0;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    color: var(--color-text);
 }
 
 .survey-card__status {
@@ -719,16 +792,19 @@ textarea {
 }
 
 .survey-card__description {
-    color: var(--color-muted);
+    color: rgba(31, 41, 51, 0.7);
     margin: 0;
-    font-size: 0.95rem;
-    line-height: 1.5;
+    font-size: 0.98rem;
+    line-height: 1.55;
 }
 
 .survey-meta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem 1.25rem;
+    padding: 1.25rem;
+    border-radius: 14px;
+    background: rgba(60, 109, 240, 0.05);
 }
 
 .survey-meta dt {
@@ -749,15 +825,15 @@ textarea {
     justify-content: space-between;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    border-top: 1px solid rgba(60, 109, 240, 0.12);
-    padding-top: 1rem;
+    gap: 0.9rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+    padding-top: 1.1rem;
 }
 
 .survey-card__chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.55rem;
 }
 
 .chip {
@@ -957,12 +1033,18 @@ textarea {
         align-items: flex-start;
     }
 
-    .page-header {
+    .page-hero {
+        margin-bottom: -1.5rem;
+        padding: 3rem 0 2.5rem;
+    }
+
+    .page-hero__content {
         flex-direction: column;
         align-items: flex-start;
     }
 
     .page-header__actions,
+    .page-hero__actions,
     .hero-actions,
     .inline-form,
     .inline-actions,
@@ -975,7 +1057,7 @@ textarea {
         padding: 1.5rem;
     }
 
-    .survey-insights {
+    .insight-grid {
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 1rem;
     }
@@ -984,12 +1066,21 @@ textarea {
         font-size: 1.6rem;
     }
 
+    .survey-meta {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+
     .survey-card__footer {
         flex-direction: column;
         align-items: stretch;
     }
 
     .survey-card__chips {
+        justify-content: flex-start;
+    }
+
+    .survey-card__actions {
+        width: 100%;
         justify-content: flex-start;
     }
 }

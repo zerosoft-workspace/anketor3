@@ -44,18 +44,22 @@ $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
-<main class="container">
-    <header class="page-header">
-        <div>
-            <p class="eyebrow">Anketler</p>
-            <h1>Stratejik Anketler</h1>
-            <p class="page-subtitle"><?php echo count($surveys); ?> kayıtlı anket ile organizasyon güvenliğini ölçün.</p>
-        </div>
-        <div class="page-header__actions">
-            <a class="button-primary" href="survey_edit.php">Yeni Anket</a>
-            <a class="button-secondary" href="dashboard.php">Gösterge Paneli</a>
+<main class="page page--surveys">
+    <header class="page-hero">
+        <div class="page-hero__content container">
+            <div class="page-hero__text">
+                <span class="page-hero__eyebrow">Anketler</span>
+                <h1 class="page-hero__title">Stratejik Anketler</h1>
+                <p class="page-hero__subtitle"><?php echo count($surveys); ?> kayıtlı anket ile organizasyon güvenliğini ölçün.</p>
+            </div>
+            <div class="page-hero__actions">
+                <a class="button-primary" href="survey_edit.php">Yeni Anket</a>
+                <a class="button-secondary" href="dashboard.php">Gösterge Paneli</a>
+            </div>
         </div>
     </header>
+
+    <div class="container">
 
     <?php if ($flash): ?>
         <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
@@ -92,12 +96,14 @@ include __DIR__ . '/templates/navbar.php';
             ],
         ];
         ?>
-        <section class="survey-insights" aria-label="Anket özetleri">
+        <section class="insight-grid" aria-label="Anket özetleri">
             <?php foreach ($insights as $insight): ?>
                 <article class="insight-card">
-                    <span class="insight-card__label"><?php echo h($insight['label']); ?></span>
+                    <div class="insight-card__meta">
+                        <span class="insight-card__label"><?php echo h($insight['label']); ?></span>
+                        <span class="insight-card__hint"><?php echo h($insight['hint']); ?></span>
+                    </div>
                     <strong class="insight-card__value"><?php echo h((string)$insight['value']); ?></strong>
-                    <span class="insight-card__hint"><?php echo h($insight['hint']); ?></span>
                 </article>
             <?php endforeach; ?>
         </section>
@@ -110,7 +116,7 @@ include __DIR__ . '/templates/navbar.php';
             <a class="button-primary" href="survey_edit.php">İlk anketi oluştur</a>
         </section>
     <?php else: ?>
-        <section class="survey-grid">
+        <section class="survey-grid" aria-label="Anket listesi">
             <?php foreach ($surveys as $survey): ?>
                 <?php
                 $period = $survey['start_date'] ? format_date($survey['start_date']) : '-';
@@ -129,18 +135,20 @@ include __DIR__ . '/templates/navbar.php';
                 $statusLabel = $statusLabels[$statusKey] ?? ($survey['status'] ? ucfirst((string)$survey['status']) : 'Bilinmiyor');
                 ?>
                 <article class="survey-card">
-                    <header class="survey-card__header">
-                        <div class="survey-card__status">
-                            <span class="status status-<?php echo h($statusKey ?: 'unknown'); ?>"><?php echo h($statusLabel); ?></span>
-                            <?php if (!empty($survey['created_at'])): ?>
-                                <span class="survey-card__status-date">Oluşturma: <?php echo h(format_date($survey['created_at'])); ?></span>
-                            <?php endif; ?>
-                        </div>
-                        <h2><?php echo h($survey['title']); ?></h2>
-                    </header>
-                    <?php if ($description): ?>
-                        <p class="survey-card__description"><?php echo h($description); ?></p>
-                    <?php endif; ?>
+                    <div class="survey-card__body">
+                        <header class="survey-card__header">
+                            <div class="survey-card__status">
+                                <span class="status status-<?php echo h($statusKey ?: 'unknown'); ?>"><?php echo h($statusLabel); ?></span>
+                                <?php if (!empty($survey['created_at'])): ?>
+                                    <span class="survey-card__status-date">Oluşturma: <?php echo h(format_date($survey['created_at'])); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <h2 class="survey-card__title"><?php echo h($survey['title']); ?></h2>
+                        </header>
+                        <?php if ($description): ?>
+                            <p class="survey-card__description"><?php echo h($description); ?></p>
+                        <?php endif; ?>
+                    </div>
                     <dl class="survey-meta">
                         <div>
                             <dt>Dönem</dt>
@@ -193,6 +201,7 @@ include __DIR__ . '/templates/navbar.php';
             <?php endforeach; ?>
         </section>
     <?php endif; ?>
+    </div>
 </main>
 <?php include __DIR__ . '/templates/footer.php'; ?>
 
