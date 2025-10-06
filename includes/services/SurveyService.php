@@ -5,12 +5,15 @@ class SurveyService
     private $config;
     private $aiClient;
     private $responseAnswersHasTypeColumn = null;
+    private $settingsService;
 
-    public function __construct(Database $db, array $config)
+    public function __construct(Database $db, array $config, ?SettingsService $settingsService = null)
     {
         $this->db = $db;
         $this->config = $config;
-        $this->aiClient = new AIClient($config['openai'] ?? []);
+        $this->settingsService = $settingsService;
+        $aiConfig = $config['ai'] ?? ($config['openai'] ?? []);
+        $this->aiClient = new AIClient($aiConfig);
     }
 
     public function aiClient(): AIClient

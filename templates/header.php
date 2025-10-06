@@ -11,4 +11,4 @@ $pageTitle = $pageTitle ?? config('app.name', 'Anketor');
     <title><?php echo h($pageTitle); ?></title>
     <link rel="stylesheet" href="<?php echo asset_url('css/style.css'); ?>">
 </head>
-<body class="app-body">
+<body class="<?php echo h($bodyClass ?? 'app-body'); ?>">

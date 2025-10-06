@@ -20,7 +20,18 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/analytics.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/ai_client.php';
+require_once __DIR__ . '/services/SettingsService.php';
 require_once __DIR__ . '/services/SurveyService.php';
 
 $db = Database::getInstance($config['db']);
-$surveyService = new SurveyService($db, $config);
+$settingsService = new SettingsService($db);
+$dynamicConfig = $settingsService->asConfig();
+if (!empty($dynamicConfig)) {
+    $config = array_replace_recursive($config, $dynamicConfig);
+    $GLOBALS['config'] = $config;
+    date_default_timezone_set($config['app']['timezone'] ?? 'UTC');
+}
+
+$GLOBALS['settingsService'] = $settingsService;
+
+$surveyService = new SurveyService($db, $config, $settingsService);

@@ -3,11 +3,21 @@ class AIClient
 {
     private $apiKey;
     private $model;
+    private $provider;
+    private $baseUrl;
+    private $deployment;
+    private $azureApiVersion;
+    private $organization;
 
     public function __construct(array $config)
     {
         $this->apiKey = $config['api_key'] ?? '';
         $this->model = $config['model'] ?? 'gpt-4o-mini';
+        $this->provider = $config['provider'] ?? 'openai';
+        $this->baseUrl = rtrim($config['base_url'] ?? 'https://api.openai.com/v1', '/');
+        $this->deployment = $config['deployment'] ?? null;
+        $this->azureApiVersion = $config['azure_api_version'] ?? '2024-02-15-preview';
+        $this->organization = $config['organization'] ?? null;
     }
 
     public function isEnabled(): bool
@@ -51,21 +61,14 @@ class AIClient
 
     private function request(string $prompt, int $maxTokens)
     {
-        $body = [
-            'model' => $this->model,
-            'input' => $prompt,
-            'max_output_tokens' => $maxTokens,
-        ];
+        [$url, $headers, $payload] = $this->buildRequest($prompt, $maxTokens);
 
-        $ch = curl_init('https://api.openai.com/v1/responses');
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $this->apiKey,
-            ],
+            CURLOPT_HTTPHEADER => $headers,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($body),
+            CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_TIMEOUT => 30,
         ]);
 
@@ -79,11 +82,62 @@ class AIClient
         curl_close($ch);
 
         $decoded = json_decode($result, true);
-        if ($status >= 200 && $status < 300 && isset($decoded['output_text'])) {
-            return trim($decoded['output_text']);
+        if ($status >= 200 && $status < 300) {
+            if (isset($decoded['output_text'])) {
+                return trim($decoded['output_text']);
+            }
+
+            if ($this->provider === 'google_gemini') {
+                $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                if ($text) {
+                    return trim($text);
+                }
+            }
         }
 
         return null;
+    }
+
+    private function buildRequest(string $prompt, int $maxTokens): array
+    {
+        $headers = ['Content-Type: application/json'];
+        $url = $this->baseUrl . '/responses';
+        $payload = [
+            'model' => $this->model,
+            'input' => $prompt,
+            'max_output_tokens' => $maxTokens,
+        ];
+
+        switch ($this->provider) {
+            case 'azure_openai':
+                $deployment = $this->deployment ?: $this->model;
+                $url = rtrim($this->baseUrl ?: '', '/') . '/openai/deployments/' . $deployment . '/responses?api-version=' . urlencode($this->azureApiVersion ?: '2024-02-15-preview');
+                $headers[] = 'api-key: ' . $this->apiKey;
+                break;
+            case 'google_gemini':
+                $url = rtrim($this->baseUrl ?: 'https://generativelanguage.googleapis.com/v1beta', '/') . '/models/' . $this->model . ':generateContent?key=' . urlencode($this->apiKey);
+                $payload = [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt],
+                            ],
+                        ],
+                    ],
+                    'generationConfig' => [
+                        'maxOutputTokens' => $maxTokens,
+                    ],
+                ];
+                break;
+            default:
+                $headers[] = 'Authorization: Bearer ' . $this->apiKey;
+                if (!empty($this->organization)) {
+                    $headers[] = 'OpenAI-Organization: ' . $this->organization;
+                }
+                break;
+        }
+
+        return [$url, $headers, $payload];
     }
 
     private function fallbackQuestions(string $topic, int $count): array
