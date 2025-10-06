@@ -4,12 +4,25 @@ require_login();
 
 $pageTitle = 'Kullanıcılar - ' . config('app.name', 'Anketor');
 $errors = [];
+$roleLabels = [
+    'super_admin' => 'Süper Yönetici',
+    'admin' => 'Yönetici',
+    'analyst' => 'Analist',
+];
 
 if (is_post()) {
     guard_csrf();
     $name = trim($_POST['name'] ?? '');
     $email = trim(strtolower($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
+    $availableRoles = is_super_admin() ? ['super_admin', 'admin', 'analyst'] : ['admin', 'analyst'];
+    $role = $_POST['role'] ?? 'admin';
+    if (!in_array($role, $availableRoles, true)) {
+        $role = 'admin';
+    }
+    if (!is_super_admin()) {
+        $role = $role === 'analyst' ? 'analyst' : 'admin';
+    }
 
     if ($name === '') {
         $errors[] = 'İsim alanı boş olamaz.';
@@ -30,8 +43,8 @@ if (is_post()) {
         } else {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $db->insert(
-                'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
-                [$name, $email, $hash]
+                'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                [$name, $email, $hash, $role]
             );
             set_flash('success', 'Yeni kullanıcı eklendi.');
             redirect('users.php');
@@ -39,7 +52,7 @@ if (is_post()) {
     }
 }
 
-$users = $db->fetchAll('SELECT id, name, email, last_login_at, created_at FROM users ORDER BY created_at DESC');
+$users = $db->fetchAll('SELECT id, name, email, role, last_login_at, created_at FROM users ORDER BY created_at DESC');
 $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
@@ -84,6 +97,18 @@ include __DIR__ . '/templates/navbar.php';
                     <label for="password">Parola</label>
                     <input type="password" id="password" name="password" required placeholder="En az 8 karakter">
                 </div>
+                <?php if (is_super_admin()): ?>
+                    <div class="form-group">
+                        <label for="role">Rol</label>
+                        <select id="role" name="role">
+                            <?php foreach (['super_admin', 'admin', 'analyst'] as $roleOption): ?>
+                                <option value="<?php echo h($roleOption); ?>" <?php echo (($_POST['role'] ?? 'admin') === $roleOption) ? 'selected' : ''; ?>><?php echo h($roleLabels[$roleOption]); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php else: ?>
+                    <input type="hidden" name="role" value="<?php echo h($_POST['role'] ?? 'admin'); ?>">
+                <?php endif; ?>
                 <div class="form-actions">
                     <button type="submit" class="button-primary">Kullanıcı Ekle</button>
                 </div>
@@ -102,6 +127,7 @@ include __DIR__ . '/templates/navbar.php';
                         <th>ID</th>
                         <th>İsim</th>
                         <th>E-posta</th>
+                        <th>Rol</th>
                         <th>Son Giriş</th>
                         <th>Kayıt Tarihi</th>
                     </tr>
@@ -112,6 +138,7 @@ include __DIR__ . '/templates/navbar.php';
                             <td><?php echo (int)$user['id']; ?></td>
                             <td><?php echo h($user['name']); ?></td>
                             <td><?php echo h($user['email']); ?></td>
+                            <td><?php echo h($roleLabels[$user['role']] ?? strtoupper($user['role'])); ?></td>
                             <td><?php echo $user['last_login_at'] ? h(format_date($user['last_login_at'], 'd.m.Y H:i')) : '-'; ?></td>
                             <td><?php echo $user['created_at'] ? h(format_date($user['created_at'], 'd.m.Y')) : '-'; ?></td>
                         </tr>

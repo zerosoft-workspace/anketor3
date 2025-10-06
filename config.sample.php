@@ -20,6 +20,14 @@ return [
     'security' => [
         'token_salt' => 'please-change-this-secret',
     ],
+    'ai' => [
+        'provider' => 'openai',
+        'api_key' => '',
+        'model' => 'gpt-4o-mini',
+        'base_url' => 'https://api.openai.com/v1',
+        'deployment' => '',
+        'azure_api_version' => '2024-02-15-preview',
+    ],
     'openai' => [
         'api_key' => '',
         'model' => 'gpt-4o-mini',

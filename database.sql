@@ -7,8 +7,16 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(120) NOT NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    role ENUM('super_admin','admin','analyst') NOT NULL DEFAULT 'admin',
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(120) NOT NULL UNIQUE,
+    setting_value TEXT NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -129,9 +137,17 @@ CREATE TABLE IF NOT EXISTS survey_reports (
     CONSTRAINT fk_reports_survey FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO users (name, email, password_hash)
-VALUES ('Admin', 'admin@example.com', '$2y$10$Wz0sMijh1X1Fh2W0Fwuq7Ot5GDL8NcNehJIKBNB1LsY5cqK8QxSN2');
+INSERT INTO users (name, email, password_hash, role)
+VALUES ('Admin', 'admin@example.com', '$2y$10$Wz0sMijh1X1Fh2W0Fwuq7Ot5GDL8NcNehJIKBNB1LsY5cqK8QxSN2', 'super_admin');
 -- Password: ChangeMe!23
+
+INSERT INTO system_settings (setting_key, setting_value) VALUES
+    ('app.name', 'Anketor'),
+    ('app.timezone', 'Europe/Istanbul'),
+    ('ai.provider', 'openai'),
+    ('ai.model', 'gpt-4o-mini')
+ON DUPLICATE KEY UPDATE
+    setting_value = VALUES(setting_value);
 -- Demo seed data
 INSERT INTO survey_categories (id, name, description) VALUES
     (1, 'Siber Guvenlik', 'Web uygulamalari, parola ve MFA odakli calismalar'),
