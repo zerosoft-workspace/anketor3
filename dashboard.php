@@ -28,28 +28,72 @@ $aiBaseUrl = config('ai.base_url', '');
 
 $quickActions = [
     [
-        'icon' => '🧠',
-        'title' => 'AI önerilerini güncelleyin',
-        'description' => 'Sistem ayarlarından sağlayıcıyı güncelleyerek raporlardaki içgörüleri uyarlayın.',
-        'url' => current_user_role() === 'super_admin' ? 'system_settings.php' : null,
-        'label' => 'Ayarları aç',
-        'hint' => current_user_role() === 'super_admin' ? null : 'Bu ayarı sadece süper admin güncelleyebilir.',
-    ],
-    [
-        'icon' => '🗂️',
-        'title' => 'Soru bankasını tazeleyin',
-        'description' => 'Sık kullanılan soruları düzenleyip taslaklarınıza ekleyin.',
-        'url' => 'survey_questions.php',
-        'label' => 'Soru havuzu',
+        'icon' => '📝',
+        'title' => 'Yeni anket planlayın',
+        'description' => 'Hedef kitleniz için özelleştirilmiş sorularla yeni bir çalışma başlatın.',
+        'url' => 'survey_edit.php',
+        'label' => 'Anket oluştur',
         'hint' => null,
     ],
     [
         'icon' => '📨',
-        'title' => 'Hatırlatma gönderin',
-        'description' => 'Katılım oranını artırmak için yanıt vermeyenlere toplu e-posta gönderin.',
+        'title' => 'Katılımcıları harekete geçirin',
+        'description' => 'Yanıt vermeyen kişileri belirleyip hatırlatma gönderileri planlayın.',
         'url' => $primarySurvey ? 'participants.php?id=' . (int)$primarySurvey['id'] : null,
         'label' => $primarySurvey ? 'Katılımcıları yönet' : null,
-        'hint' => $primarySurvey ? null : 'Odaklanacak bir anket seçildiğinde etkinleşir.',
+        'hint' => $primarySurvey ? null : 'Önce aktif bir anket seçin.',
+    ],
+    [
+        'icon' => '🧠',
+        'title' => 'AI yapılandırmasını gözden geçirin',
+        'description' => 'Raporlarınızın bağlamını iyileştirmek için sağlayıcı tercihlerini güncelleyin.',
+        'url' => current_user_role() === 'super_admin' ? 'system_settings.php' : null,
+        'label' => current_user_role() === 'super_admin' ? 'Genel ayarları aç' : null,
+        'hint' => current_user_role() === 'super_admin' ? null : 'Bu alan süper admin tarafından yönetilir.',
+    ],
+];
+
+$insights = [];
+if ($totalInvites === 0) {
+    $insights[] = 'Henüz davet gönderilmedi. İlk anketinizi planlayarak geri bildirim toplamaya başlayın.';
+} elseif ($responseRate < 45) {
+    $insights[] = 'Yanıt oranı %' . $responseRate . ' seviyesinde. Katılımı artırmak için hatırlatma göndermeyi değerlendirin.';
+} else {
+    $insights[] = 'Yanıt oranınız %' . $responseRate . ' ile güçlü görünüyor. Raporlarınızı düzenli olarak güncelleyin.';
+}
+
+if ((int)$stats['active'] === 0) {
+    $insights[] = 'Şu anda aktif anket bulunmuyor. Yeni bir çalışma oluşturarak panelinizi hareketlendirebilirsiniz.';
+}
+
+if ($aiProviderLabel) {
+    $insights[] = 'Rapor özetleri ' . $aiProviderLabel . ' tarafından destekleniyor. Model tercihlerini dilediğiniz zaman güncelleyebilirsiniz.';
+}
+
+$statCards = [
+    [
+        'icon' => '📋',
+        'label' => 'Toplam anket',
+        'value' => (int)$stats['surveys'],
+        'meta' => 'Yayınladığınız tüm çalışmalar',
+    ],
+    [
+        'icon' => '✨',
+        'label' => 'Aktif anket',
+        'value' => (int)$stats['active'],
+        'meta' => 'Katılımcılara açık olanlar',
+    ],
+    [
+        'icon' => '✅',
+        'label' => 'Toplanan yanıt',
+        'value' => (int)$stats['responses'],
+        'meta' => 'Raporlara işlenen kayıtlar',
+    ],
+    [
+        'icon' => '⏳',
+        'label' => 'Bekleyen davet',
+        'value' => (int)$stats['pending'],
+        'meta' => 'Yanıt bekleyen katılımcılar',
     ],
 ];
 
@@ -59,179 +103,110 @@ $flash = get_flash();
 include __DIR__ . '/templates/header.php';
 include __DIR__ . '/templates/navbar.php';
 ?>
-<main class="dashboard-shell">
+<main class="dashboard">
     <?php if ($flash): ?>
-        <div class="alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
+        <div class="dashboard__flash alert alert-<?php echo h($flash['type']); ?>"><?php echo h($flash['message']); ?></div>
     <?php endif; ?>
 
-    <section class="dashboard-hero">
-        <span class="dashboard-hero__halo" aria-hidden="true"></span>
-        <span class="dashboard-hero__halo dashboard-hero__halo--two" aria-hidden="true"></span>
-
-        <div class="dashboard-hero__grid">
-            <div class="dashboard-hero__primary">
-                <span class="dashboard-hero__eyebrow">Kontrol Merkezi</span>
-                <h1 class="dashboard-hero__title">Merhaba <?php echo h(current_user_name()); ?> 👋</h1>
-                <p class="dashboard-hero__lead">
-                    <?php echo (int)$stats['active']; ?> aktif anket, <?php echo (int)$stats['responses']; ?> yanıt ve <?php echo (int)$stats['pending']; ?> bekleyen davet ile <strong><?php echo h(config('app.name', 'Anketor')); ?></strong> topluluğunun nabzını tutuyoruz.
-                </p>
-
-                <ul class="dashboard-hero__metrics">
-                    <li class="metric-card metric-card--accent">
-                        <div class="metric-card__top">
-                            <span class="metric-card__label">Yanıt oranı</span>
-                            <span class="metric-card__value"><?php echo $totalInvites > 0 ? h($responseRate) . '%' : 'N/A'; ?></span>
-                        </div>
-                        <div class="metric-card__progress" aria-hidden="true">
-                            <span style="width: <?php echo max(8, min(100, $responseRate)); ?>%"></span>
-                        </div>
-                        <span class="metric-card__meta"><?php echo $totalInvites > 0 ? h($totalInvites) . ' toplam davet' : 'Henüz davet yok'; ?></span>
-                    </li>
-                    <li class="metric-card">
-                        <span class="metric-card__label">Aktif anket</span>
-                        <span class="metric-card__value"><?php echo (int)$stats['active']; ?></span>
-                        <span class="metric-card__meta"><?php echo (int)$stats['surveys']; ?> toplam anket içerisinde</span>
-                    </li>
-                    <li class="metric-card">
-                        <span class="metric-card__label">Toplanan yanıt</span>
-                        <span class="metric-card__value"><?php echo (int)$stats['responses']; ?></span>
-                        <span class="metric-card__meta">Raporlarda değerlendirildi</span>
-                    </li>
-                    <li class="metric-card">
-                        <span class="metric-card__label">Bekleyen davet</span>
-                        <span class="metric-card__value"><?php echo (int)$stats['pending']; ?></span>
-                        <span class="metric-card__meta">Takip edilmeyi bekliyor</span>
-                    </li>
-                </ul>
-
-                <div class="dashboard-hero__actions">
-                    <a class="button-primary" href="survey_edit.php">Yeni Anket Oluştur</a>
-                    <?php if (!empty($primarySurvey['id'])): ?>
-                        <a class="button-secondary" href="survey_questions.php?id=<?php echo (int)$primarySurvey['id']; ?>">Soruları düzenle</a>
-                    <?php endif; ?>
-                    <a class="button-link" href="reports.php">Raporları incele</a>
-                </div>
+    <section class="dashboard-welcome" aria-labelledby="dashboard-title">
+        <div class="dashboard-welcome__content">
+            <span class="dashboard-welcome__eyebrow">Anket yönetim merkezi</span>
+            <h1 id="dashboard-title" class="dashboard-welcome__title">Merhaba <?php echo h(current_user_name()); ?> 👋</h1>
+            <p class="dashboard-welcome__lead">
+                <?php echo (int)$stats['surveys']; ?> anket ve <?php echo (int)$stats['responses']; ?> yanıtla topluluğunuz hakkında derin içgörüler elde ediyorsunuz.
+                Kontrol paneli üzerinden süreçlerinizi hızla yönetebilirsiniz.
+            </p>
+            <div class="dashboard-welcome__actions">
+                <a class="button-primary" href="survey_edit.php">Yeni anket oluştur</a>
+                <a class="button-secondary" href="surveys.php">Anketleri yönet</a>
+                <a class="button-link" href="reports.php">Raporları incele</a>
             </div>
-
-            <aside class="dashboard-hero__secondary">
-                <div class="dashboard-card dashboard-card--ai">
-                    <span class="dashboard-card__eyebrow">Yapay zekâ</span>
-                    <h2 class="dashboard-card__title">Yapılandırma Özeti</h2>
-                    <dl class="dashboard-card__list">
-                        <div>
-                            <dt>Sağlayıcı</dt>
-                            <dd><?php echo h($aiProviderLabel); ?></dd>
-                        </div>
-                        <?php if (!empty($aiModel)): ?>
-                            <div>
-                                <dt>Model</dt>
-                                <dd><?php echo h($aiModel); ?></dd>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($aiDeployment)): ?>
-                            <div>
-                                <dt>Deployment</dt>
-                                <dd><?php echo h($aiDeployment); ?></dd>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($aiBaseUrl)): ?>
-                            <div>
-                                <dt>API Adresi</dt>
-                                <dd title="<?php echo h($aiBaseUrl); ?>"><?php echo h($aiBaseUrl); ?></dd>
-                            </div>
-                        <?php endif; ?>
-                    </dl>
-                    <?php if (current_user_role() === 'super_admin'): ?>
-                        <a class="button-secondary" href="system_settings.php">Genel ayarları yönet</a>
-                    <?php else: ?>
-                        <p class="dashboard-card__hint">Genel ayarlar süper yönetici tarafından yönetilir.</p>
-                    <?php endif; ?>
-                </div>
-
-                <div class="dashboard-card dashboard-card--spotlight">
-                    <?php if ($primarySurvey): ?>
-                        <span class="dashboard-card__eyebrow">Odak anket</span>
-                        <h2 class="dashboard-card__title"><?php echo h($primarySurvey['title']); ?></h2>
-                        <ul class="spotlight-list">
-                            <li>
-                                <span>Durum</span>
-                                <strong class="status-pill status-<?php echo h($primarySurvey['status']); ?>"><?php echo h($primarySurvey['status']); ?></strong>
-                            </li>
-                            <li>
-                                <span>Dönem</span>
-                                <strong><?php echo $primarySurvey['start_date'] ? h(format_date($primarySurvey['start_date'])) : '-'; ?> — <?php echo $primarySurvey['end_date'] ? h(format_date($primarySurvey['end_date'])) : '-'; ?></strong>
-                            </li>
-                        </ul>
-                        <div class="dashboard-card__actions">
-                            <a class="button-secondary" href="participants.php?id=<?php echo (int)$primarySurvey['id']; ?>">Katılımcıları yönet</a>
-                            <a class="button-link" href="survey_edit.php?id=<?php echo (int)$primarySurvey['id']; ?>">Detayları düzenle</a>
-                        </div>
-                    <?php else: ?>
-                        <span class="dashboard-card__eyebrow">Başlangıç</span>
-                        <h2 class="dashboard-card__title">İlk anketini başlat</h2>
-                        <p>Katılımcı deneyimini izlemek için yeni bir anket oluştur, davetleri planla ve raporları takip et.</p>
-                        <div class="dashboard-card__actions">
-                            <a class="button-secondary" href="survey_edit.php">Anket oluştur</a>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </aside>
-        </div>
-    </section>
-
-    <section class="dashboard-overview">
-        <header class="dashboard-section__header">
-            <h2>İhtiyaçlarınıza odaklanan araçlar</h2>
-            <p>Anketlerin yaşam döngüsünü uçtan uca yönetirken modern bir deneyim sunuyoruz.</p>
-        </header>
-
-        <div class="overview-grid">
-            <article class="overview-card">
-                <span class="overview-card__icon">🎯</span>
-                <h3>Akıllı planlama</h3>
-                <p>Kitle segmentlerini seçip davetleri zamanlayarak etkileşimi doğru anda yakalayın.</p>
-            </article>
-            <article class="overview-card">
-                <span class="overview-card__icon">📊</span>
-                <h3>Derin raporlar</h3>
-                <p>Yapay zekâ destekli özetlerle yanıtları okuyup karar süreçlerini hızlandırın.</p>
-            </article>
-            <article class="overview-card">
-                <span class="overview-card__icon">🤝</span>
-                <h3>Takım uyumu</h3>
-                <p>Rollere göre kısıtlanan erişimle ekibini aynı anda güvenle çalıştırın.</p>
-            </article>
-        </div>
-    </section>
-
-    <section class="dashboard-main">
-        <div class="module-card module-card--surveys">
-            <header class="module-card__header">
+            <dl class="dashboard-welcome__meta">
                 <div>
-                    <h2>Son anketler</h2>
-                    <p class="module-card__description">Ekibinin güncel çalışmalarını takip ederek hızlıca aksiyon al.</p>
+                    <dt>Aktif anket</dt>
+                    <dd><?php echo (int)$stats['active']; ?></dd>
+                    <small><?php echo (int)$stats['surveys']; ?> toplam çalışmadan</small>
                 </div>
-                <a class="button-link" href="surveys.php">Tümünü gör</a>
-            </header>
+                <div>
+                    <dt>Yanıt oranı</dt>
+                    <dd><?php echo $totalInvites > 0 ? h($responseRate) . '%' : 'N/A'; ?></dd>
+                    <small><?php echo $totalInvites > 0 ? h($totalInvites) . ' davet' : 'Henüz davet yok'; ?></small>
+                </div>
+                <div>
+                    <dt>Toplanan yanıt</dt>
+                    <dd><?php echo (int)$stats['responses']; ?></dd>
+                    <small>Raporlara işlendi</small>
+                </div>
+            </dl>
+        </div>
+        <div class="dashboard-welcome__panel">
+            <article class="welcome-card welcome-card--ai" aria-labelledby="ai-summary-title">
+                <span class="welcome-card__eyebrow">Yapay zekâ</span>
+                <h2 id="ai-summary-title" class="welcome-card__title"><?php echo h($aiProviderLabel); ?></h2>
+                <p class="welcome-card__lead">Seçilen sağlayıcı rapor yorumlarını ve içgörü önerilerini kişiselleştirir.</p>
+                <dl class="data-list">
+                    <?php if (!empty($aiModel)): ?>
+                        <div>
+                            <dt>Model</dt>
+                            <dd><?php echo h($aiModel); ?></dd>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($aiDeployment)): ?>
+                        <div>
+                            <dt>Deployment</dt>
+                            <dd><?php echo h($aiDeployment); ?></dd>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($aiBaseUrl)): ?>
+                        <div>
+                            <dt>API Adresi</dt>
+                            <dd title="<?php echo h($aiBaseUrl); ?>"><?php echo h($aiBaseUrl); ?></dd>
+                        </div>
+                    <?php endif; ?>
+                </dl>
+                <?php if (current_user_role() === 'super_admin'): ?>
+                    <a class="button-secondary" href="system_settings.php">Genel ayarları güncelle</a>
+                <?php else: ?>
+                    <p class="welcome-card__hint">Bu ayarlar süper admin tarafından düzenlenir.</p>
+                <?php endif; ?>
+            </article>
+            <article class="welcome-card welcome-card--support">
+                <h3>Destek ekibi yanınızda</h3>
+                <p>Sorularınız için bize yazın, kurulum ve rapor süreçlerini birlikte planlayalım.</p>
+                <a class="button-secondary" href="mailto:support@anketor.com">support@anketor.com</a>
+            </article>
+        </div>
+    </section>
 
-            <?php if (empty($recentSurveys)): ?>
-                <div class="empty-state">
-                    <h3>Henüz anket oluşturulmadı</h3>
-                    <p>İlk anketini oluşturduğunda burada özetini göreceksin.</p>
-                    <a class="button-primary" href="survey_edit.php">Anket oluştur</a>
+    <section class="dashboard-stats" aria-label="Kontrol paneli istatistikleri">
+        <?php foreach ($statCards as $card): ?>
+            <article class="stat-card">
+                <div class="stat-card__icon" aria-hidden="true"><?php echo $card['icon']; ?></div>
+                <div>
+                    <h3 class="stat-card__label"><?php echo h($card['label']); ?></h3>
+                    <p class="stat-card__value"><?php echo h($card['value']); ?></p>
+                    <p class="stat-card__meta"><?php echo h($card['meta']); ?></p>
                 </div>
-            <?php else: ?>
-                <div class="survey-list">
+            </article>
+        <?php endforeach; ?>
+    </section>
+
+    <div class="dashboard-layout">
+        <section class="panel">
+            <header class="panel__header">
+                <h2>Son anketler</h2>
+                <p>En güncel çalışmalarınızı burada görebilir ve hızlıca aksiyona geçebilirsiniz.</p>
+            </header>
+            <?php if ($recentSurveys): ?>
+                <ul class="survey-list">
                     <?php foreach ($recentSurveys as $survey): ?>
-                        <article class="survey-item">
-                            <header class="survey-item__header">
-                                <div>
-                                    <h3><?php echo h($survey['title']); ?></h3>
-                                    <span class="survey-item__meta"><?php echo h($survey['category_name'] ?? 'Genel'); ?></span>
-                                </div>
+                        <li class="survey-card">
+                            <div class="survey-card__header">
+                                <h3><?php echo h($survey['title']); ?></h3>
                                 <span class="status-pill status-<?php echo h($survey['status']); ?>"><?php echo h($survey['status']); ?></span>
-                            </header>
-                            <dl class="survey-item__dates">
+                            </div>
+                            <p class="survey-card__meta">Oluşturan: <?php echo h($survey['owner_name'] ?? 'Bilinmiyor'); ?></p>
+                            <dl class="survey-card__dates">
                                 <div>
                                     <dt>Başlangıç</dt>
                                     <dd><?php echo $survey['start_date'] ? h(format_date($survey['start_date'])) : '-'; ?></dd>
@@ -241,49 +216,89 @@ include __DIR__ . '/templates/navbar.php';
                                     <dd><?php echo $survey['end_date'] ? h(format_date($survey['end_date'])) : '-'; ?></dd>
                                 </div>
                             </dl>
-                            <div class="survey-item__actions">
-                                <a class="button-secondary" href="survey_questions.php?id=<?php echo (int)$survey['id']; ?>">Soruları yönet</a>
-                                <a class="button-link" href="survey_edit.php?id=<?php echo (int)$survey['id']; ?>">Detayları düzenle</a>
+                            <div class="survey-card__actions">
+                                <a class="button-secondary" href="survey_edit.php?id=<?php echo (int)$survey['id']; ?>">Ayrıntıları düzenle</a>
+                                <a class="button-link" href="participants.php?id=<?php echo (int)$survey['id']; ?>">Katılımcılar</a>
                             </div>
-                        </article>
+                        </li>
                     <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="empty-state">
+                    <h3>Henüz anket oluşturmadınız</h3>
+                    <p>Yeni bir anket planlayarak katılımcılardan geri bildirim toplamaya başlayın.</p>
+                    <a class="button-primary" href="survey_edit.php">İlk anketini oluştur</a>
                 </div>
             <?php endif; ?>
-        </div>
+        </section>
 
-        <aside class="dashboard-sidebar">
-            <div class="module-card module-card--actions">
-                <header class="module-card__header">
-                    <div>
-                        <h2>Hızlı işlemler</h2>
-                        <p class="module-card__description">Planınıza hız kazandırın ve sık yapılan işleri dakikalara indirin.</p>
-                    </div>
+        <aside class="panel-group">
+            <section class="panel panel--accent">
+                <header class="panel__header">
+                    <h2>Odak anket</h2>
+                    <p>Aktif çalışmalarınızdan birini yakından takip edin.</p>
                 </header>
-                <ul class="action-list">
+                <?php if ($primarySurvey): ?>
+                    <div class="focus-card">
+                        <h3><?php echo h($primarySurvey['title']); ?></h3>
+                        <dl>
+                            <div>
+                                <dt>Durum</dt>
+                                <dd><span class="status-pill status-<?php echo h($primarySurvey['status']); ?>"><?php echo h($primarySurvey['status']); ?></span></dd>
+                            </div>
+                            <div>
+                                <dt>Dönem</dt>
+                                <dd><?php echo $primarySurvey['start_date'] ? h(format_date($primarySurvey['start_date'])) : '-'; ?> — <?php echo $primarySurvey['end_date'] ? h(format_date($primarySurvey['end_date'])) : '-'; ?></dd>
+                            </div>
+                        </dl>
+                        <div class="focus-card__actions">
+                            <a class="button-primary" href="participants.php?id=<?php echo (int)$primarySurvey['id']; ?>">Katılımcıları yönet</a>
+                            <a class="button-link" href="survey_reports.php?id=<?php echo (int)$primarySurvey['id']; ?>">Raporu aç</a>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-hint">
+                        <p>Odaklanacak bir anket seçmek için yeni bir çalışma başlatın.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <section class="panel">
+                <header class="panel__header">
+                    <h2>Hızlı işlemler</h2>
+                    <p>İş akışınızı hızlandırmak için önerilen adımlar.</p>
+                </header>
+                <ul class="quick-actions">
                     <?php foreach ($quickActions as $action): ?>
-                        <li class="action-list__item<?php echo empty($action['url']) ? ' is-disabled' : ''; ?>">
-                            <span class="action-list__icon"><?php echo h($action['icon']); ?></span>
-                            <div class="action-list__body">
+                        <li class="quick-actions__item<?php echo $action['url'] ? '' : ' is-disabled'; ?>">
+                            <div class="quick-actions__icon" aria-hidden="true"><?php echo $action['icon']; ?></div>
+                            <div class="quick-actions__body">
                                 <strong><?php echo h($action['title']); ?></strong>
                                 <p><?php echo h($action['description']); ?></p>
                                 <?php if (!empty($action['url']) && !empty($action['label'])): ?>
                                     <a class="button-link" href="<?php echo h($action['url']); ?>"><?php echo h($action['label']); ?></a>
-                                <?php elseif (!empty($action['hint'])): ?>
-                                    <span class="action-list__hint"><?php echo h($action['hint']); ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($action['hint'])): ?>
+                                    <span class="quick-actions__hint"><?php echo h($action['hint']); ?></span>
                                 <?php endif; ?>
                             </div>
                         </li>
                     <?php endforeach; ?>
                 </ul>
-            </div>
+            </section>
 
-            <div class="module-card support-card">
-                <h2>Destek ekibimiz yanında</h2>
-                <p>Soruların için dilediğin zaman <a href="mailto:support@anketor.com">support@anketor.com</a> adresine yazabilirsin.</p>
-                <a class="button-secondary" href="mailto:support@anketor.com">support@anketor.com</a>
-                <p class="support-card__meta">Yardım merkezindeki rehberlerle yeni özellikleri keşfetmeyi unutma.</p>
-            </div>
+            <section class="panel panel--secondary">
+                <header class="panel__header">
+                    <h2>Panel rehberi</h2>
+                    <p>Güncel metriklere göre önerilen sonraki adımlar.</p>
+                </header>
+                <ul class="insight-list">
+                    <?php foreach ($insights as $insight): ?>
+                        <li><?php echo h($insight); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
         </aside>
-    </section>
+    </div>
 </main>
 <?php include __DIR__ . '/templates/footer.php'; ?>
